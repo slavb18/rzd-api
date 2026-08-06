@@ -3,6 +3,7 @@ import mcp from "./mcp.js";
 import { schemeImageKinds, type SchemeImageKind } from "./src/api.js";
 import { RzdClient } from "./src/client.js";
 import { configFromEnvironment } from "./src/config.js";
+import { logEvent, redact } from "./src/log.js";
 import { renderLanding } from "./src/landing.js";
 
 /** Serves the carriage drawing with the free berths painted. It exists because the clients
@@ -35,8 +36,11 @@ const app = new Elysia()
         headers: { "content-type": image.mimeType, "cache-control": "public, max-age=86400, immutable" },
       });
     } catch (error) {
+      // The detail goes to the log, never to the caller: a failed request carries the URL it
+      // failed on, and that URL may be the private endpoint this server is configured with.
+      logEvent({ scheme: schemeId, kind, error: redact(error instanceof Error ? error.message : String(error), client.config.baseUrl).slice(0, 200) });
       set.status = 502;
-      return { error: error instanceof Error ? error.message : String(error) };
+      return { error: "The carriage drawing could not be fetched." };
     } finally { client.close(); }
   })
   .all("/mcp", ({ request }) => mcp.fetch(request))

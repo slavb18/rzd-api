@@ -24,3 +24,12 @@ export function schemeImageUrl(baseUrl: string, schemeId: number, kind: string, 
   if (free.length) url.searchParams.set("free", free.join(","));
   return url.toString();
 }
+
+/** Removes the configured endpoint from a message. Anything derived from a failed request can
+ *  carry the URL that failed, and that URL may be a private proxy: it must not reach a caller,
+ *  and there is no reason for it to sit in a log line either. */
+export function redact(message: string, baseUrl: string): string {
+  const base = baseUrl.replace(/\/$/, "");
+  if (!base) return message;
+  return message.split(base).join("<endpoint>");
+}
