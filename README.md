@@ -111,8 +111,13 @@ docker compose up -d
 
 Проект содержит Vercel Functions без web-фреймворка:
 
+- `https://<project>.vercel.app/` — страница с краткой документацией;
 - `https://<project>.vercel.app/mcp` — публичный Streamable HTTP MCP;
 - `https://<project>.vercel.app/health` — healthcheck.
+
+Страница собирается в `src/landing.ts` из того же `registerMcpTools`, что
+регистрирует инструменты в MCP: новый инструмент без русского описания роняет
+сборку страницы, поэтому таблица не может разойтись с сервером.
 
 Vercel entrypoint использует Elysia, официальный `mcp-handler` и Bun Runtime.
 Маршруты принадлежат самому приложению; Vercel rewrites не используются.

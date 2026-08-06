@@ -1,6 +1,36 @@
 import { describe, expect, test } from "bun:test";
 import app from "../app.ts";
 import mcp from "../mcp.ts";
+import { toolCatalog } from "../src/landing.ts";
+
+describe("landing page", () => {
+  test("serves HTML at the site root", async () => {
+    const response = await app.handle(new Request("https://example.vercel.app/"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toStartWith("text/html");
+  });
+
+  test("documents the public MCP endpoint", async () => {
+    expect(await page()).toContain("https://rzd-api.vercel.app/mcp");
+  });
+
+  test("lists every registered MCP tool with a Russian description", async () => {
+    const html = await page();
+    const catalog = toolCatalog();
+    expect(catalog.length).toBeGreaterThan(0);
+    for (const tool of catalog) {
+      expect(html).toContain(tool.name);
+      expect(tool.summary).toMatch(/[а-яё]/i);
+      expect(html).toContain(tool.summary);
+    }
+  });
+
+  test("keeps the disclaimer on the page", async () => {
+    expect(await page()).toContain("не связан");
+  });
+});
+
+async function page(): Promise<string> { return app.handle(new Request("https://example.vercel.app/")).then((response) => response.text()); }
 
 describe("Vercel functions", () => {
   test("exposes a health response", async () => {
@@ -30,6 +60,7 @@ describe("Vercel functions", () => {
     for (const name of [
       "search_tickets", "find_stations", "get_carriages", "get_train_availability",
       "get_minimal_prices", "get_car_scheme", "get_car_images", "get_route_stations",
+      "search_full_compartments",
     ]) expect(body).toContain(`\"name\":\"${name}\"`);
   });
 });
