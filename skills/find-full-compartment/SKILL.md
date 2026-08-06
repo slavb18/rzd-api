@@ -20,9 +20,18 @@ description: Find fully available four-seat compartments on Russian trains over 
      breakdown; say the compartment could not be confirmed.
 5. Present the earliest matching dates first. Include train, local departure and
    arrival, car, compartment, places, service class, and estimated total price.
-6. State the `checkedAt` timestamp from the response and warn that availability
+   Keep the place markers as returned: `36Ж` is a berth in a women-only
+   compartment and `6С` one in a mixed compartment - the passenger sees these on
+   the ticket, so never strip them down to the bare number.
+6. For a compartment worth booking, call `get_car_scheme` for that car and give
+   the `imageUrls` link so the traveller can see which berths sit behind one
+   door. Pass `include_image` when the reply should show the drawing itself,
+   with the compartment's places in `free_places` so they are filled blue - an
+   unpainted drawing shows every berth in the same near-white and reads as
+   empty. It arrives as a PNG of roughly 60 KB per carriage.
+7. State the `checkedAt` timestamp from the response and warn that availability
    and prices change in real time.
-7. Report every entry in `errors` as a date that was not checked, rather than as
+8. Report every entry in `errors` as a date that was not checked, rather than as
    a date with no compartments.
-8. Never claim to reserve or purchase tickets; direct the user to verify and buy
+9. Never claim to reserve or purchase tickets; direct the user to verify and buy
    through an authorized RZD sales channel.

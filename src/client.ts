@@ -1,8 +1,9 @@
-import { RzdApi } from "./api.js";
+import { RzdApi, type SchemeImageKind } from "./api.js";
+import type { SchemePlaces } from "./raster.js";
 import { findFullCompartments, type FullCompartmentCandidate, type FullCompartmentMatch, type FullCompartmentSearch } from "./compartments.js";
 import { makeConfig, type RzdConfig } from "./config.js";
 import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.js";
-import type { CarImagesResult, CarriageResult, CarScheme, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
+import type { CarImagesResult, CarriageResult, CarScheme, SchemeImageContent, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
 
 type DateInput = string | Date;
 type CacheEntry = { at: number; stations: Station[] };
@@ -80,6 +81,7 @@ export class RzdClient {
   async getMinimalPrices(from: string | number, to: string | number, dateFrom: DateInput): Promise<MinimalPricingResult> { const start = parseDateTime(dateFrom, "dateFrom"); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getMinimalPricing(origin, destination, datePart(start)); }
   async getCarriages(from: string | number, to: string | number, departureDate: DateInput, departureTime: string, trainNumber: string, provider = "P1"): Promise<CarriageResult> { const departure = withTime(parseDateTime(departureDate, "departureDate"), departureTime); requireText({ trainNumber, provider }); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getCarriages(origin, destination, formatDateTime(departure), trainNumber.trim(), provider.trim()); }
   async getCarScheme(departureDate: DateInput, departureTime: string, trainNumber: string, carNumber: string, carSubType: string, serviceClass: string, carrier: string, carNumeration = "FromHead"): Promise<CarScheme> { return this.api.getCarScheme(metadataInput(departureDate, departureTime, { trainNumber, carNumber, carSubType, serviceClass, carrier, carNumeration })); }
+  async getSchemeImage(schemeId: number, kind: SchemeImageKind, places: SchemePlaces = {}): Promise<SchemeImageContent> { this.#ensureOpen(); return this.api.getSchemeImage(schemeId, kind, places); }
   async getCarImages(departureDate: DateInput, departureTime: string, trainNumber: string, carNumber: string, carSubType: string, serviceClass: string, carrier: string, carNumeration = "FromHead"): Promise<CarImagesResult> { return this.api.getCarImages(metadataInput(departureDate, departureTime, { trainNumber, carNumber, carSubType, serviceClass, carrier, carNumeration })); }
   async getRouteStations(from: string | number, to: string | number, departureDate: DateInput, departureTime: string, trainNumber: string, provider = "P1"): Promise<RouteStationsResult> { const departure = withTime(parseDateTime(departureDate, "departureDate"), departureTime); requireText({ trainNumber, provider }); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getRouteStations(origin, destination, formatDateTime(departure), trainNumber.trim(), provider.trim()); }
   async #resolveDirection(from: string | number, to: string | number): Promise<[string, string]> { const [origin, destination] = await Promise.all([this.resolveStationCode(from), this.resolveStationCode(to)]); if (origin === destination) throw new RzdValidationError("Origin and destination stations must be different."); return [origin, destination]; }

@@ -27,7 +27,7 @@ export class RzdTransport {
           body: options.body ? JSON.stringify(options.body) : undefined,
           signal: AbortSignal.timeout(this.config.timeoutMs),
           ...(this.config.proxy ? { proxy: this.config.proxy } : {}),
-          tls: { rejectUnauthorized: false },
+          tls: { rejectUnauthorized: !this.config.insecureTls },
         } as RequestInit);
         const text = await response.text();
         if (!response.ok) {
@@ -50,6 +50,20 @@ export class RzdTransport {
       }
     }
     throw new RzdTransportError(`RZD request failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+  }
+
+  async requestBytes(url: string): Promise<{ data: Uint8Array; mimeType: string }> {
+    if (this.#closed) throw new RzdTransportError("The RZD client is closed.");
+    const response = await fetch(url, {
+      headers: { Accept: "image/svg+xml, image/*", "User-Agent": this.config.userAgent ?? "Mozilla/5.0 AppleWebKit/537.36 Chrome/146 Safari/537.36", Referer: this.config.referer ?? "https://ticket.rzd.ru/" },
+      signal: AbortSignal.timeout(this.config.timeoutMs),
+      ...(this.config.proxy ? { proxy: this.config.proxy } : {}),
+      tls: { rejectUnauthorized: !this.config.insecureTls },
+    } as RequestInit);
+    if (!response.ok) throw new RzdHttpError(response.status, (await response.text()).slice(0, 300).trim());
+    const mimeType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!mimeType.startsWith("image/")) throw new RzdTransportError(`RZD returned ${mimeType || "an unknown content type"} instead of an image.`);
+    return { data: new Uint8Array(await response.arrayBuffer()), mimeType };
   }
 
   #raiseApiError(payload: JsonObject): void {

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
+    "@resvg/resvg-wasm": "^2.6.2",
     "elysia": "^1.4.29",
     "mcp-handler": "^2.1.0",
     "zod": "^4.4.3"

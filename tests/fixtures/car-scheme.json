@@ -1,0 +1,15 @@
+{
+  "SchemeId": 552,
+  "CarSubType": "66К",
+  "StartDate": "2025-05-30T00:00:00",
+  "EndDate": "2049-01-01T00:00:00",
+  "TrainNumber": null,
+  "Carrier": null,
+  "CarNumber": null,
+  "ServiceClass": null,
+  "PcSchemeFirstStorey": "/552/PcFirstStorey",
+  "PcSchemeSecondStorey": null,
+  "MobileSchemeFirstVertStorey": "/552/MobileFirstStoreyVert",
+  "MobileSchemeSecondVertStorey": null,
+  "Direction": "Unknown"
+}
