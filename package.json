@@ -9,7 +9,7 @@
   "bin": {
     "rzd-mcp-server": "src/mcp.ts"
   },
-  "files": ["src", "README.md", "LICENSE"],
+  "files": ["src", "skills", "README.md", "LICENSE"],
   "scripts": {
     "mcp": "bun run src/mcp.ts",
     "mcp:http": "MCP_TRANSPORT=streamable-http bun run src/mcp.ts",

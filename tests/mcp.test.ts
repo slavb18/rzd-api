@@ -13,7 +13,8 @@ describe("MCP stdio protocol", () => {
     const result = await client.listTools();
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
       "find_stations", "get_car_images", "get_car_scheme", "get_carriages",
-      "get_minimal_prices", "get_route_stations", "get_train_availability", "search_tickets",
+      "get_minimal_prices", "get_route_stations", "get_train_availability",
+      "search_full_compartments", "search_tickets",
     ]);
   });
 });

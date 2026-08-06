@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `searchFullCompartments()` и MCP-инструмент `search_full_compartments`: перебор
+  диапазона дат с разделением подтверждённого купе и кандидата.
+- Skill `find-full-compartment` перенесён из Python-версии и описывает работу с
+  `confirmed`, `candidates`, `errors` и `checkedAt`.
+- Фикстуры вагонов и тест инварианта: вагон попадает в `confirmed` только если
+  ответ API перечислил нужные места внутри одного купе.
+
 ## 4.0.0
 
 - Полный перенос клиента и MCP-сервера с Python на Bun/TypeScript.
