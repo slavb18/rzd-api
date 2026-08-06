@@ -1,0 +1,36 @@
+{
+  "name": "rzd-api",
+  "version": "4.0.0",
+  "description": "Typed Bun client and MCP server for the unofficial ticket.rzd.ru API",
+  "author": "slavb18",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "rzd-mcp-server": "src/mcp.ts"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "mcp": "bun run src/mcp.ts",
+    "mcp:http": "MCP_TRANSPORT=streamable-http bun run src/mcp.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test"
+  },
+  "engines": { "bun": ">=1.2.0" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slavb18/rzd-api.git"
+  },
+  "homepage": "https://github.com/slavb18/rzd-api#readme",
+  "bugs": "https://github.com/slavb18/rzd-api/issues",
+  "license": "MIT"
+}
