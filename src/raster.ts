@@ -1,3 +1,4 @@
+import { logEvent } from "./log.js";
 import { schemeFont } from "./scheme-font.js";
 
 export interface SchemePlaces { free?: number[]; selected?: number[] }
@@ -44,12 +45,32 @@ export function paint(svg: string, places: SchemePlaces): string {
 async function loadRenderer(): Promise<Renderer | null> {
   try {
     const { initWasm, Resvg } = await import("@resvg/resvg-wasm");
-    await initWasm(await Bun.file(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))).arrayBuffer());
+    await initWasm(await wasmBytes());
     const fontBuffers = [Uint8Array.from(atob(schemeFont), (character) => character.charCodeAt(0))];
     return (svg) => new Resvg(svg, {
       fitTo: { mode: "width", value: outputWidth },
       background: "white",
       font: { fontBuffers, defaultFontFamily: "DejaVu Sans", loadSystemFonts: false },
     }).render().asPng();
-  } catch { return null; }
+  } catch (error) {
+    // Without this the drawing silently degrades to SVG, which no model can look at, and
+    // nothing anywhere says why.
+    logEvent({ rasterizer: "unavailable", error: error instanceof Error ? error.message.slice(0, 200) : String(error) });
+    return null;
+  }
+}
+
+/** The bundler has to see the wasm to ship it. A plain `new URL(..., import.meta.url)` is the
+ *  form deployment tracing recognises; the package specifier resolved at runtime is not, and a
+ *  function bundled without the file falls back to SVG. */
+async function wasmBytes(): Promise<ArrayBuffer> {
+  const candidates = [
+    new URL("../node_modules/@resvg/resvg-wasm/index_bg.wasm", import.meta.url),
+    new URL("./node_modules/@resvg/resvg-wasm/index_bg.wasm", import.meta.url),
+  ];
+  for (const candidate of candidates) {
+    const file = Bun.file(candidate);
+    if (await file.exists()) return file.arrayBuffer();
+  }
+  return Bun.file(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))).arrayBuffer();
 }
