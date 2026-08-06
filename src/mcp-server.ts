@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod/v4";
 import { RzdClient } from "./client.js";
+import { configFromEnvironment } from "./config.js";
 
 const station = z.string().describe("Station name or numeric station code");
 const date = z.string().describe("Date in DD.MM.YYYY, YYYY-MM-DD, or ISO format");
@@ -38,4 +39,4 @@ function register<S extends Shape>(server: ToolServer, name: string, description
   }) as never);
 }
 
-async function usingClient<T>(callback: (client: RzdClient) => Promise<T>): Promise<T> { const client = new RzdClient(); try { return await callback(client); } finally { client.close(); } }
+async function usingClient<T>(callback: (client: RzdClient) => Promise<T>): Promise<T> { const client = new RzdClient(configFromEnvironment()); try { return await callback(client); } finally { client.close(); } }

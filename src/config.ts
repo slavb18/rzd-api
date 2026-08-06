@@ -33,3 +33,12 @@ export function makeConfig(config: Partial<RzdConfig> = {}): RzdConfig {
   if (value.timeoutMs <= 0 || value.retryTotal < 0 || value.retryBackoffMs < 0 || value.stationCacheTtlMs < 0 || value.stationCacheSize < 0) throw new RzdValidationError("Numeric configuration values are outside their supported range.");
   return value;
 }
+
+export function configFromEnvironment(
+  env: Record<string, string | undefined> = process.env,
+): Partial<RzdConfig> {
+  return {
+    ...(env.RZD_BASE_URL ? { baseUrl: env.RZD_BASE_URL } : {}),
+    ...(env.RZD_B2B_BASE_URL ? { b2bBaseUrl: env.RZD_B2B_BASE_URL } : {}),
+  };
+}

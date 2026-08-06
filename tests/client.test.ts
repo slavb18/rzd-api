@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { makeConfig, RzdClient, RzdValidationError } from "../src/index.ts";
+import { configFromEnvironment, makeConfig, RzdClient, RzdValidationError } from "../src/index.ts";
 
 describe("configuration", () => {
   test("applies defaults and overrides", () => {
@@ -7,6 +7,15 @@ describe("configuration", () => {
   });
   test("rejects invalid URLs", () => {
     expect(() => makeConfig({ baseUrl: "ftp://example.test" })).toThrow(RzdValidationError);
+  });
+  test("reads endpoint overrides from environment", () => {
+    expect(configFromEnvironment({
+      RZD_BASE_URL: "https://proxy.example/api/",
+      RZD_B2B_BASE_URL: "https://proxy.example/b2b/",
+    })).toEqual({
+      baseUrl: "https://proxy.example/api/",
+      b2bBaseUrl: "https://proxy.example/b2b/",
+    });
   });
 });
 

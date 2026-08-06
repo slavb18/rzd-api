@@ -95,6 +95,9 @@ docker compose up -d
 Vercel entrypoint использует Elysia, официальный `mcp-handler` и Bun Runtime.
 Маршруты принадлежат самому приложению; Vercel rewrites не используются.
 
+Endpoint РЖД можно переопределить переменными окружения `RZD_BASE_URL` и
+`RZD_B2B_BASE_URL`. Значения не должны храниться в репозитории.
+
 ```sh
 vercel deploy
 ```
