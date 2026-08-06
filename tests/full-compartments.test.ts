@@ -107,6 +107,20 @@ describe("full compartment search", () => {
     client.close();
   });
 
+  test("starts from today when the month it was given has already begun", async () => {
+    const client = clientWith("car-pricing-one-compartment");
+    const result = await client.searchFullCompartments("2000000", "2034130", day(-20), day(2));
+    expect(result.dateFrom).toBe(day(0));
+    expect(result.dateTo).toBe(day(2));
+    client.close();
+  });
+
+  test("refuses a range that is entirely behind us", async () => {
+    const client = clientWith("car-pricing-one-compartment");
+    await expect(client.searchFullCompartments("2000000", "2034130", day(-20), day(-5))).rejects.toThrow("past");
+    client.close();
+  });
+
   test("rejects a range longer than 31 days before making a request", async () => {
     const client = clientWith("car-pricing-one-compartment");
     await expect(client.searchFullCompartments("2000000", "2034130", day(30), day(70))).rejects.toThrow("31 days");

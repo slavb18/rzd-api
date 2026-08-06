@@ -60,8 +60,14 @@ export class RzdClient {
     if (!Number.isInteger(places) || places < 2) throw new RzdValidationError("places must be an integer of at least two.");
     if (!Number.isInteger(maxResults) || maxResults < 1) throw new RzdValidationError("maxResults must be an integer greater than zero.");
     if (!Number.isInteger(maxRequests) || maxRequests < 1) throw new RzdValidationError("maxRequests must be an integer greater than zero.");
-    const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo");
-    if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom.");
+    // "Find me a compartment in August" arrives as the whole month even when August has begun.
+    // Refusing the request over dates that have already passed helps nobody: the range starts
+    // today instead, and dateFrom in the answer says so.
+    const requested = parseDateTime(dateFrom, "dateFrom", { allowPast: true }), end = parseDateTime(dateTo, "dateTo", { allowPast: true });
+    if (end < requested) throw new RzdValidationError("dateTo must not be earlier than dateFrom.");
+    const today = new Date(`${datePart(new Date())}T00:00:00+03:00`);
+    if (datePart(end) < datePart(today)) throw new RzdValidationError("The whole date range is in the past.");
+    const start = requested < today ? today : requested;
     const dates = dateRange(start, end);
     if (dates.length > 31) throw new RzdValidationError("The date range must not exceed 31 days.");
     const confirmed: FullCompartmentMatch[] = [], candidates: FullCompartmentCandidate[] = [], errors: { date: string; error: string }[] = [];
@@ -130,7 +136,7 @@ export class RzdClient {
   close(): void { if (!this.#closed) { this.#closed = true; this.#cache.clear(); this.api.close(); } }
 }
 
-function parseDateTime(input: DateInput, field: string): Date { let value: Date; if (input instanceof Date) value = new Date(input); else { const raw = String(input).trim(); if (!raw) throw new RzdValidationError(`${field} must not be empty.`); const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw); value = match ? new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00+03:00`) : new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00+03:00` : raw); } if (Number.isNaN(value.valueOf())) throw new RzdValidationError(`${field} must use DD.MM.YYYY, YYYY-MM-DD or ISO datetime format.`); const today = moscowParts(new Date()); const parts = moscowParts(value); if (`${parts.year}-${parts.month}-${parts.day}` < `${today.year}-${today.month}-${today.day}`) throw new RzdValidationError(`${field} must not be in the past.`); return value; }
+function parseDateTime(input: DateInput, field: string, options: { allowPast?: boolean } = {}): Date { let value: Date; if (input instanceof Date) value = new Date(input); else { const raw = String(input).trim(); if (!raw) throw new RzdValidationError(`${field} must not be empty.`); const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw); value = match ? new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00+03:00`) : new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00+03:00` : raw); } if (Number.isNaN(value.valueOf())) throw new RzdValidationError(`${field} must use DD.MM.YYYY, YYYY-MM-DD or ISO datetime format.`); const today = moscowParts(new Date()); const parts = moscowParts(value); if (!options.allowPast && `${parts.year}-${parts.month}-${parts.day}` < `${today.year}-${today.month}-${today.day}`) throw new RzdValidationError(`${field} must not be in the past.`); return value; }
 function moscowParts(date: Date): { year: string; month: string; day: string; hour: string; minute: string; second: string } { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(date); const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value; return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), second: get("second") }; }
 function datePart(date: Date): string { const p = moscowParts(date); return `${p.year}-${p.month}-${p.day}`; }
 function moscowTimestamp(date: Date): string { return `${formatDateTime(date)}+03:00`; }
