@@ -49,24 +49,34 @@ export class RzdClient {
     throw new RzdAmbiguousStationError(value, [...new Map(matches.map((s) => [s.code, s])).values()]);
   }
 
-  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number } = {}): Promise<FullCompartmentSearch> {
+  /** One call fans out into an upstream request per date plus one per train, so it stays
+   *  bounded twice over: a train whose compartment groups are all smaller than the party
+   *  cannot hold the compartment and is never opened, and the scan stops at a request budget,
+   *  naming the dates it never reached rather than passing them off as empty. */
+  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number } = {}): Promise<FullCompartmentSearch> {
     this.#ensureOpen();
-    const { places = 4, adults = places, maxResults = 100 } = options;
+    const { places = 4, adults = places, maxResults = 100, maxRequests = 150 } = options;
     if (!Number.isInteger(places) || places < 2) throw new RzdValidationError("places must be an integer of at least two.");
     if (!Number.isInteger(maxResults) || maxResults < 1) throw new RzdValidationError("maxResults must be an integer greater than zero.");
+    if (!Number.isInteger(maxRequests) || maxRequests < 1) throw new RzdValidationError("maxRequests must be an integer greater than zero.");
     const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo");
     if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom.");
     const dates = dateRange(start, end);
     if (dates.length > 31) throw new RzdValidationError("The date range must not exceed 31 days.");
     const confirmed: FullCompartmentMatch[] = [], candidates: FullCompartmentCandidate[] = [], errors: { date: string; error: string }[] = [];
-    let truncated = false;
-    for (const date of dates) {
-      if (truncated) break;
+    let truncated = false, requests = 0, index = 0;
+    for (; index < dates.length; index++) {
+      const date = dates[index]!;
+      if (truncated || requests >= maxRequests) { truncated = true; break; }
       try {
+        requests++;
         const routes = await this.searchTickets(from, to, date, { adults }) as TrainRoute[];
         for (const route of routes) {
           const departureTime = route.departureTime?.slice(11, 16);
           if (!departureTime || !/^\d{2}:\d{2}$/.test(departureTime)) continue;
+          if (!canHoldCompartment(route, places)) continue;
+          if (requests >= maxRequests) { truncated = true; break; }
+          requests++;
           const scan = findFullCompartments(await this.getCarriages(from, to, date, departureTime, route.number, route.provider ?? "P1"), places);
           confirmed.push(...scan.confirmed.map((match) => ({ date, trainNumber: route.number, departureTime: route.departureTime, arrivalTime: route.arrivalTime, ...match })));
           candidates.push(...scan.candidates.map((candidate) => ({ date, trainNumber: route.number, ...candidate })));
@@ -74,7 +84,7 @@ export class RzdClient {
         }
       } catch (error) { errors.push({ date, error: error instanceof Error ? error.message : String(error) }); }
     }
-    return { dateFrom: dates[0]!, dateTo: dates[dates.length - 1]!, places, confirmed: confirmed.slice(0, maxResults), candidates, errors, truncated, checkedAt: moscowTimestamp(new Date()) };
+    return { dateFrom: dates[0]!, dateTo: dates[dates.length - 1]!, places, confirmed: confirmed.slice(0, maxResults), candidates, errors, unchecked: dates.slice(index), requests, truncated, checkedAt: moscowTimestamp(new Date()) };
   }
 
   async getTrainAvailability(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput): Promise<TrainAvailabilityResult> { const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo"); if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom."); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getTrainAvailability(origin, destination, datePart(start), datePart(end)); }
@@ -98,4 +108,12 @@ function formatDateTime(date: Date): string { const p = moscowParts(date); retur
 function withTime(date: Date, time: string): Date { if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time.trim())) throw new RzdValidationError("departureTime must use HH:MM format."); return new Date(`${datePart(date)}T${time.trim()}:00+03:00`); }
 function requireText(values: Record<string, string>): void { const empty = Object.entries(values).filter(([, v]) => !String(v).trim()).map(([k]) => k); if (empty.length) throw new RzdValidationError(`${empty.join(", ")} must not be empty.`); }
 function metadataInput(date: DateInput, time: string, values: Record<string, string>): Record<string, string> { requireText(values); return { departureDate: formatDateTime(withTime(parseDateTime(date, "departureDate"), time)), ...Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim()])) }; }
+/** A car group gathers several carriages, so it can never hold fewer free places than any
+ *  single carriage inside it: when no compartment group reaches the party size, no compartment
+ *  in that train can either, and its carriages need not be fetched. */
+function canHoldCompartment(route: TrainRoute, places: number): boolean {
+  const groups = route.carGroups.filter((group) => group.carType === undefined || group.carType === "Compartment");
+  if (!groups.length) return false;
+  return groups.some((group) => group.availablePlaces === undefined || group.availablePlaces >= places);
+}
 function filterRoutes(routes: TrainRoute[], enabled: boolean): TrainRoute[] { if (!enabled) return routes; return routes.filter((route) => { if (route.availablePlaces === undefined) throw new RzdSchemaError(`Cannot determine seat availability for train ${route.number}.`); return route.availablePlaces > 0; }); }

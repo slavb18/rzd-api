@@ -55,7 +55,8 @@ resolves to two station codes, so `find_stations` first and pick or ask.
    60 KB; `imageUrls` also holds a link to the original drawing.
 7. State the `checkedAt` timestamp and warn that availability and prices change
    in real time.
-8. Report every entry in `errors` as a date that was not checked, never as a
-   date with no compartments.
+8. Report every entry in `errors` and every date in `unchecked` as a date that
+   was not searched, never as a date with no compartments. `unchecked` means the
+   scan hit its request budget; offer to continue from the first date in it.
 9. Never claim to reserve or buy tickets; point to an authorized RZD sales
    channel.

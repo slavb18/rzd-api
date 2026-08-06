@@ -29,6 +29,32 @@ describe("full compartment search", () => {
     client.close();
   });
 
+  test("does not open the carriages of a train whose compartments cannot hold the party", async () => {
+    const fetched: string[] = [];
+    const client = clientWith("car-pricing-one-compartment", { onCarriages: (date) => fetched.push(date), carGroups: [{ carType: "ReservedSeat", availablePlaces: 96, raw: {} }] });
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30));
+    expect(fetched).toEqual([]);
+    expect(result.confirmed).toEqual([]);
+    client.close();
+  });
+
+  test("stops at the request budget and names the dates it never checked", async () => {
+    const client = clientWith("car-pricing-one-compartment");
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(32), { maxRequests: 2 });
+    expect(result.truncated).toBe(true);
+    expect(result.unchecked).toEqual([day(31), day(32)]);
+    expect(result.requests).toBe(2);
+    client.close();
+  });
+
+  test("counts the requests it spent when the whole range fits", async () => {
+    const client = clientWith("car-pricing-one-compartment");
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(31));
+    expect(result.unchecked).toEqual([]);
+    expect(result.requests).toBe(4);
+    client.close();
+  });
+
   test("rejects a range longer than 31 days before making a request", async () => {
     const client = clientWith("car-pricing-one-compartment");
     await expect(client.searchFullCompartments("2000000", "2034130", day(30), day(70))).rejects.toThrow("31 days");
@@ -44,13 +70,19 @@ describe("full compartment search", () => {
   });
 });
 
-function clientWith(fixture: string, failOn: (date: string) => boolean = () => false): RzdClient {
+interface FakeOptions { failOn?: (date: string) => boolean; onCarriages?: (date: string) => void; carGroups?: TrainRoute["carGroups"] }
+
+function clientWith(fixture: string, options: FakeOptions | ((date: string) => boolean) = {}): RzdClient {
+  const { failOn = () => false, onCarriages = () => {}, carGroups = [{ carType: "Compartment", availablePlaces: 4, raw: {} }] } = typeof options === "function" ? { failOn: options } as FakeOptions : options;
+  let departureDate = "";
   const api = {
     async getTrainRoutes(input: { departureDate: string }): Promise<TrainRoute[]> {
-      if (failOn(input.departureDate.slice(0, 10))) throw new Error("upstream unavailable");
-      return [{ number: "002Э", departureTime: `${input.departureDate.slice(0, 10)}T01:00:00`, availablePlaces: 4, carGroups: [], raw: {}, provider: "P1" }];
+      departureDate = input.departureDate.slice(0, 10);
+      if (failOn(departureDate)) throw new Error("upstream unavailable");
+      return [{ number: "002Э", departureTime: `${departureDate}T01:00:00`, availablePlaces: 4, carGroups, raw: {}, provider: "P1" }];
     },
     async getCarriages(): Promise<CarriageResult> {
+      onCarriages(departureDate);
       const payload = await Bun.file(`${import.meta.dir}/fixtures/${fixture}.json`).json();
       const transport = { requestJson: async () => payload, close() {} } as unknown as RzdTransport;
       return new RzdApi(makeConfig(), transport).getCarriages("2000000", "2034130", "2026-09-01T01:00:00", "002Э", "P1");
