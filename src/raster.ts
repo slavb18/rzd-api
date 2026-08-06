@@ -1,5 +1,6 @@
 import { logEvent } from "./log.js";
 import { schemeFont } from "./scheme-font.js";
+import { schemeWasm } from "./scheme-wasm.js";
 
 export interface SchemePlaces { free?: number[]; selected?: number[] }
 export type Rasterizer = (svg: string, places?: SchemePlaces) => Promise<Uint8Array | null>;
@@ -45,8 +46,11 @@ export function paint(svg: string, places: SchemePlaces): string {
 async function loadRenderer(): Promise<Renderer | null> {
   try {
     const { initWasm, Resvg } = await import("@resvg/resvg-wasm");
-    await initWasm(await wasmBytes());
-    const fontBuffers = [Uint8Array.from(atob(schemeFont), (character) => character.charCodeAt(0))];
+    const unpacked = Bun.gunzipSync(decode(schemeWasm));
+    const wasm = new Uint8Array(unpacked.byteLength);
+    wasm.set(unpacked);
+    await initWasm(wasm);
+    const fontBuffers = [decode(schemeFont)];
     return (svg) => new Resvg(svg, {
       fitTo: { mode: "width", value: outputWidth },
       background: "white",
@@ -60,17 +64,9 @@ async function loadRenderer(): Promise<Renderer | null> {
   }
 }
 
-/** The bundler has to see the wasm to ship it. A plain `new URL(..., import.meta.url)` is the
- *  form deployment tracing recognises; the package specifier resolved at runtime is not, and a
- *  function bundled without the file falls back to SVG. */
-async function wasmBytes(): Promise<ArrayBuffer> {
-  const candidates = [
-    new URL("../node_modules/@resvg/resvg-wasm/index_bg.wasm", import.meta.url),
-    new URL("./node_modules/@resvg/resvg-wasm/index_bg.wasm", import.meta.url),
-  ];
-  for (const candidate of candidates) {
-    const file = Bun.file(candidate);
-    if (await file.exists()) return file.arrayBuffer();
-  }
-  return Bun.file(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))).arrayBuffer();
+function decode(base64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
