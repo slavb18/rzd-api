@@ -13,7 +13,7 @@ const date = z.string().describe("Date in DD.MM.YYYY, YYYY-MM-DD, or ISO format"
  *  can actually show a picture. */
 export const serverInstructions = [
   "Use these read-only tools to search the unofficial ticket.rzd.ru API. Dates must not be in the past, and both availability and the internal RZD response schemas change without notice.",
-  "For a whole compartment - four berths behind one door rather than four berths somewhere in the same carriage - call search_full_compartments. It answers that question from the carriage response instead of leaving it to inference, returns the nearest few dates, and draws the compartment it found: the reply already carries the carriage drawing with those berths filled blue, so show it and never look for a picture elsewhere.",
+  "For a whole compartment - four berths behind one door rather than four berths somewhere in the same carriage - call search_full_compartments. It answers that question from the carriage response instead of leaving it to inference, returns the nearest few dates, and draws the compartment it found: the reply carries the carriage drawing with those berths filled blue, both as an image block and as a link in image.url. Show that link and never look for a picture elsewhere - photographs found on the web are of some other carriage.",
   "To show the carriage, call get_car_scheme with include_image and the compartment's berths in free_places: it returns the drawing as a PNG with those berths filled blue. get_car_images returns titles and identifiers only, its paths do not resolve to an image, and photographs found elsewhere are not evidence about this carriage.",
 ].join("\n\n");
 
@@ -52,9 +52,12 @@ export function registerMcpTools(server: ToolServer): void {
 /** Splits a result carrying an `image` into a text block and a real image block, so the
  *  drawing arrives as a picture rather than as base64 buried in JSON. */
 function imageAndText(value: unknown): ContentBlock[] {
-  const image = (value as { image?: { data: string; mimeType: string } }).image;
+  const image = (value as { image?: { data: string; mimeType: string; url?: string } }).image;
   const { image: _omitted, ...rest } = value as Record<string, unknown>;
-  return [{ type: "text", text: JSON.stringify(rest, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
+  // The link stays in the text: a client that drops image blocks would otherwise be left with
+  // nothing to show, and goes looking for a photograph of some other carriage instead.
+  const described = image ? { ...rest, image: { ...image, data: undefined, mimeType: undefined } } : rest;
+  return [{ type: "text", text: JSON.stringify(described, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
 }
 
 type Shape = Record<string, z.ZodTypeAny>;

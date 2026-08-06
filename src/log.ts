@@ -14,3 +14,13 @@ export function endpointLabel(url: string, baseUrl: string): string {
   if (withoutQuery.startsWith(base)) return withoutQuery.slice(base.length).replace(/^\//, "");
   try { return new URL(withoutQuery).pathname.replace(/^\//, ""); } catch { return "unknown"; }
 }
+
+/** A link to the drawing on this server. Clients that only pass text through - and the ones
+ *  this server actually talks to do exactly that - cannot use an image block, so the picture
+ *  has to be reachable by URL. It points here rather than at ticket.rzd.ru because only this
+ *  server paints the free berths; the upstream drawing is an unpainted template. */
+export function schemeImageUrl(baseUrl: string, schemeId: number, kind: string, free: number[]): string {
+  const url = new URL(`${baseUrl.replace(/\/$/, "")}/scheme/${schemeId}/${kind}.png`);
+  if (free.length) url.searchParams.set("free", free.join(","));
+  return url.toString();
+}
