@@ -98,6 +98,15 @@ describe("full compartment search", () => {
     client.close();
   });
 
+  test("comes back with what it has when it runs out of time", async () => {
+    const client = clientWith("car-pricing-split-compartments", { delayMs: 30 });
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(40), { maxSeconds: 0.1 });
+    expect(result.truncated).toBe(true);
+    expect(result.unchecked.length).toBeGreaterThan(0);
+    expect(result.candidates.length).toBeGreaterThan(0);
+    client.close();
+  });
+
   test("rejects a range longer than 31 days before making a request", async () => {
     const client = clientWith("car-pricing-one-compartment");
     await expect(client.searchFullCompartments("2000000", "2034130", day(30), day(70))).rejects.toThrow("31 days");
@@ -113,10 +122,10 @@ describe("full compartment search", () => {
   });
 });
 
-interface FakeOptions { failOn?: (date: string) => boolean; onCarriages?: (date: string) => void; carGroups?: TrainRoute["carGroups"]; onSchemeImage?: (...args: unknown[]) => void; schemeFails?: boolean }
+interface FakeOptions { delayMs?: number; failOn?: (date: string) => boolean; onCarriages?: (date: string) => void; carGroups?: TrainRoute["carGroups"]; onSchemeImage?: (...args: unknown[]) => void; schemeFails?: boolean }
 
 function clientWith(fixture: string, options: FakeOptions | ((date: string) => boolean) = {}): RzdClient {
-  const { failOn = () => false, onCarriages = () => {}, carGroups = [{ carType: "Compartment", availablePlaces: 4, raw: {} }], onSchemeImage = () => {}, schemeFails = false } = typeof options === "function" ? { failOn: options } as FakeOptions : options;
+  const { delayMs = 0, failOn = () => false, onCarriages = () => {}, carGroups = [{ carType: "Compartment", availablePlaces: 4, raw: {} }], onSchemeImage = () => {}, schemeFails = false } = typeof options === "function" ? { failOn: options } as FakeOptions : options;
   let departureDate = "";
   const api = {
     async getTrainRoutes(input: { departureDate: string }): Promise<TrainRoute[]> {
@@ -126,6 +135,7 @@ function clientWith(fixture: string, options: FakeOptions | ((date: string) => b
     },
     async getCarriages(): Promise<CarriageResult> {
       onCarriages(departureDate);
+      if (delayMs) await Bun.sleep(delayMs);
       const payload = await Bun.file(`${import.meta.dir}/fixtures/${fixture}.json`).json();
       const transport = { requestJson: async () => payload, close() {} } as unknown as RzdTransport;
       return new RzdApi(makeConfig(), transport).getCarriages("2000000", "2034130", "2026-09-01T01:00:00", "002Э", "P1");
