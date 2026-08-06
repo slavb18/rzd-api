@@ -85,6 +85,20 @@ export MCP_AUTH_TOKEN="replace-with-a-random-token-at-least-32-characters"
 docker compose up -d
 ```
 
+## Vercel
+
+Проект содержит нативные Bun Functions без web-фреймворка:
+
+- `https://<project>.vercel.app/api/mcp` — Streamable HTTP MCP;
+- `https://<project>.vercel.app/api/health` — healthcheck.
+
+Для закрытого MCP задайте `MCP_AUTH_TOKEN` в настройках Vercel. Без этой
+переменной endpoint публичный.
+
+```sh
+vercel deploy
+```
+
 ## Разработка
 
 ```sh
