@@ -54,9 +54,9 @@ export class RzdClient {
    *  bounded twice over: a train whose compartment groups are all smaller than the party
    *  cannot hold the compartment and is never opened, and the scan stops at a request budget,
    *  naming the dates it never reached rather than passing them off as empty. */
-  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number; image?: boolean } = {}): Promise<FullCompartmentSearch> {
+  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number; image?: boolean; maxSeconds?: number } = {}): Promise<FullCompartmentSearch> {
     this.#ensureOpen();
-    const { places = 4, adults = places, maxResults = 3, maxRequests = 150, image = true } = options;
+    const { places = 4, adults = places, maxResults = 3, maxRequests = 150, image = true, maxSeconds = 9 } = options;
     if (!Number.isInteger(places) || places < 2) throw new RzdValidationError("places must be an integer of at least two.");
     if (!Number.isInteger(maxResults) || maxResults < 1) throw new RzdValidationError("maxResults must be an integer greater than zero.");
     if (!Number.isInteger(maxRequests) || maxRequests < 1) throw new RzdValidationError("maxRequests must be an integer greater than zero.");
@@ -67,9 +67,13 @@ export class RzdClient {
     const confirmed: FullCompartmentMatch[] = [], candidates: FullCompartmentCandidate[] = [], errors: { date: string; error: string }[] = [];
     let firstCar: { car: Carriage; date: string; time: string; train: string } | undefined;
     let truncated = false, requests = 0, index = 0;
+    // A serverless invocation is killed after a few seconds, and a killed call tells the caller
+    // nothing at all - it looks exactly like the upstream being down. Better to stop in time and
+    // hand back what was found, naming the dates that were never reached.
+    const deadline = Date.now() + maxSeconds * 1000;
     for (; index < dates.length; index++) {
       const date = dates[index]!;
-      if (truncated || requests >= maxRequests) { truncated = true; break; }
+      if (truncated || requests >= maxRequests || Date.now() > deadline) { truncated = true; break; }
       try {
         requests++;
         const routes = await this.searchTickets(from, to, date, { adults }) as TrainRoute[];
@@ -77,7 +81,7 @@ export class RzdClient {
           const departureTime = route.departureTime?.slice(11, 16);
           if (!departureTime || !/^\d{2}:\d{2}$/.test(departureTime)) continue;
           if (!canHoldCompartment(route, places)) continue;
-          if (requests >= maxRequests) { truncated = true; break; }
+          if (requests >= maxRequests || Date.now() > deadline) { truncated = true; break; }
           requests++;
           const carriages = await this.getCarriages(from, to, date, departureTime, route.number, route.provider ?? "P1");
           const scan = findFullCompartments(carriages, places);
