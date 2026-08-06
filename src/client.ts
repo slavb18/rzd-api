@@ -55,7 +55,7 @@ export class RzdClient {
    *  naming the dates it never reached rather than passing them off as empty. */
   async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number } = {}): Promise<FullCompartmentSearch> {
     this.#ensureOpen();
-    const { places = 4, adults = places, maxResults = 100, maxRequests = 150 } = options;
+    const { places = 4, adults = places, maxResults = 3, maxRequests = 150 } = options;
     if (!Number.isInteger(places) || places < 2) throw new RzdValidationError("places must be an integer of at least two.");
     if (!Number.isInteger(maxResults) || maxResults < 1) throw new RzdValidationError("maxResults must be an integer greater than zero.");
     if (!Number.isInteger(maxRequests) || maxRequests < 1) throw new RzdValidationError("maxRequests must be an integer greater than zero.");
@@ -84,7 +84,12 @@ export class RzdClient {
         }
       } catch (error) { errors.push({ date, error: error instanceof Error ? error.message : String(error) }); }
     }
-    return { dateFrom: dates[0]!, dateTo: dates[dates.length - 1]!, places, confirmed: confirmed.slice(0, maxResults), candidates, errors, unchecked: dates.slice(index), requests, truncated, checkedAt: moscowTimestamp(new Date()) };
+    return {
+      dateFrom: dates[0]!, dateTo: dates[dates.length - 1]!, places,
+      confirmed: confirmed.slice(0, maxResults), candidates: candidates.slice(0, maxResults),
+      omitted: { confirmed: Math.max(0, confirmed.length - maxResults), candidates: Math.max(0, candidates.length - maxResults) },
+      errors, unchecked: dates.slice(index), requests, truncated, checkedAt: moscowTimestamp(new Date()),
+    };
   }
 
   async getTrainAvailability(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput): Promise<TrainAvailabilityResult> { const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo"); if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom."); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getTrainAvailability(origin, destination, datePart(start), datePart(end)); }

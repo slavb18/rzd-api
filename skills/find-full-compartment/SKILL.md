@@ -29,7 +29,9 @@ resolves to two station codes, so `find_stations` first and pick or ask.
 ## Answering
 
 1. Call `search_full_compartments` once with the direction, the ISO range and
-   `places`.
+   `places`. It returns the three nearest options and stops looking there, which
+   is what someone planning a trip wants; pass `max_results` when a number is
+   asked for ("покажи 5 вариантов").
 2. Report only `confirmed` entries as a compartment. Each carries the car and
    compartment number and the exact berths the carriage response listed inside
    that compartment.
@@ -56,7 +58,11 @@ resolves to two station codes, so `find_stations` first and pick or ask.
 7. State the `checkedAt` timestamp and warn that availability and prices change
    in real time.
 8. Report every entry in `errors` and every date in `unchecked` as a date that
-   was not searched, never as a date with no compartments. `unchecked` means the
-   scan hit its request budget; offer to continue from the first date in it.
-9. Never claim to reserve or buy tickets; point to an authorized RZD sales
-   channel.
+   was not searched, never as a date with no compartments. `unchecked` holds the
+   dates the scan stopped short of, either because enough options were found or
+   because it hit its request budget. On "покажи ещё" or "а на следующие даты",
+   search again from the first date in `unchecked`.
+9. `omitted` counts what was found and not returned. Mention it in one clause -
+   "ещё 12 вагонов с той же причиной" - rather than listing everything.
+10. Never claim to reserve or buy tickets; point to an authorized RZD sales
+    channel.

@@ -12,7 +12,7 @@ export interface CompartmentScan { confirmed: CompartmentMatch[]; candidates: Co
 
 export interface FullCompartmentMatch extends CompartmentMatch { date: string; trainNumber: string; departureTime?: string; arrivalTime?: string }
 export interface FullCompartmentCandidate extends CompartmentCandidate { date: string; trainNumber: string }
-export interface FullCompartmentSearch { dateFrom: string; dateTo: string; places: number; confirmed: FullCompartmentMatch[]; candidates: FullCompartmentCandidate[]; errors: { date: string; error: string }[]; unchecked: string[]; requests: number; truncated: boolean; checkedAt: string }
+export interface FullCompartmentSearch { dateFrom: string; dateTo: string; places: number; confirmed: FullCompartmentMatch[]; candidates: FullCompartmentCandidate[]; errors: { date: string; error: string }[]; omitted: { confirmed: number; candidates: number }; unchecked: string[]; requests: number; truncated: boolean; checkedAt: string }
 
 export function findFullCompartments(result: CarriageResult, required = 4): CompartmentScan {
   const confirmed: CompartmentMatch[] = [];

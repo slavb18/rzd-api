@@ -55,6 +55,23 @@ describe("full compartment search", () => {
     client.close();
   });
 
+  test("stops as soon as the asked-for number of options is found", async () => {
+    const client = clientWith("car-pricing-one-compartment");
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(34), { maxResults: 2 });
+    expect(result.confirmed.map((match) => match.date)).toEqual([day(30), day(31)]);
+    expect(result.requests).toBe(4);
+    expect(result.unchecked).toEqual([day(32), day(33), day(34)]);
+    client.close();
+  });
+
+  test("returns the asked-for number of candidates and says how many it left out", async () => {
+    const client = clientWith("car-pricing-split-compartments");
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(32), { maxResults: 2 });
+    expect(result.candidates.map((candidate) => candidate.date)).toEqual([day(30), day(31)]);
+    expect(result.omitted).toEqual({ confirmed: 0, candidates: 1 });
+    client.close();
+  });
+
   test("rejects a range longer than 31 days before making a request", async () => {
     const client = clientWith("car-pricing-one-compartment");
     await expect(client.searchFullCompartments("2000000", "2034130", day(30), day(70))).rejects.toThrow("31 days");
