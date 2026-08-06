@@ -57,7 +57,9 @@ function imageAndText(value: unknown): ContentBlock[] {
   // The link stays in the text, and goes first: a client that drops image blocks would
   // otherwise have nothing to show, and one that truncates a long result would cut the link
   // off the end - both send it looking for a photograph of some other carriage instead.
-  const described = image ? { image: { url: image.url, carNumber: image.carNumber, compartmentNumber: image.compartmentNumber }, ...rest } : rest;
+  const described = image
+    ? { schemeImageUrl: image.url, schemeImageShows: `вагон ${image.carNumber ?? "?"}, купе ${image.compartmentNumber ?? "?"}, свободные места залиты синим`, ...rest }
+    : rest;
   if (!image) return [{ type: "text", text: JSON.stringify(described, null, 2) }];
   return [
     { type: "text", text: JSON.stringify(described, null, 2) },

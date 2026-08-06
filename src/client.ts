@@ -2,7 +2,7 @@ import { RzdApi, type SchemeImageKind } from "./api.js";
 import type { SchemePlaces } from "./raster.js";
 import { findFullCompartments, type FullCompartmentCandidate, type FullCompartmentMatch, type FullCompartmentSearch, type SearchImage } from "./compartments.js";
 import { makeConfig, type RzdConfig } from "./config.js";
-import { schemeImageUrl } from "./log.js";
+import { logEvent, schemeImageUrl } from "./log.js";
 import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.js";
 import type { Carriage, CarImagesResult, CarriageResult, CarScheme, SchemeImageContent, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
 
@@ -121,7 +121,12 @@ export class RzdClient {
       const content = await this.getSchemeImage(scheme.schemeId, "PcFirstStorey", { free: match.places });
       const url = schemeImageUrl(this.config.publicBaseUrl, scheme.schemeId, "PcFirstStorey", match.places);
       return { image: { ...content, url, carNumber: match.carNumber, compartmentNumber: match.compartmentNumber } };
-    } catch { return {}; }
+    } catch (error) {
+      // Silently dropping the drawing is how "the search returns no scheme" happened without a
+      // trace: the answer still stands, but the reason belongs in the log.
+      logEvent({ drawing: "skipped", car: source.car.number, subType: source.car.carSubType, serviceClass: source.car.serviceClass, carrier: source.car.carrier, error: error instanceof Error ? error.message.slice(0, 160) : String(error) });
+      return {};
+    }
   }
 
   async getTrainAvailability(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput): Promise<TrainAvailabilityResult> { const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo"); if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom."); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getTrainAvailability(origin, destination, datePart(start), datePart(end)); }
