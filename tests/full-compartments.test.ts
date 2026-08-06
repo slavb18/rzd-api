@@ -72,6 +72,32 @@ describe("full compartment search", () => {
     client.close();
   });
 
+  test("draws the compartment it found without being asked for a picture", async () => {
+    const asked: unknown[] = [];
+    const client = clientWith("car-pricing-one-compartment", { onSchemeImage: (...args) => asked.push(args) });
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30));
+    expect(result.image).toEqual({ data: "UE5H", mimeType: "image/png", carNumber: "07", compartmentNumber: "1" });
+    expect(asked).toEqual([[552, "PcFirstStorey", { free: [1, 2, 3, 4] }]]);
+    client.close();
+  });
+
+  test("leaves the picture out when it is turned off", async () => {
+    const asked: unknown[] = [];
+    const client = clientWith("car-pricing-one-compartment", { onSchemeImage: (...args) => asked.push(args) });
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30), { image: false });
+    expect(result.image).toBeUndefined();
+    expect(asked).toEqual([]);
+    client.close();
+  });
+
+  test("still answers when the drawing cannot be fetched", async () => {
+    const client = clientWith("car-pricing-one-compartment", { schemeFails: true });
+    const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30));
+    expect(result.confirmed).toHaveLength(1);
+    expect(result.image).toBeUndefined();
+    client.close();
+  });
+
   test("rejects a range longer than 31 days before making a request", async () => {
     const client = clientWith("car-pricing-one-compartment");
     await expect(client.searchFullCompartments("2000000", "2034130", day(30), day(70))).rejects.toThrow("31 days");
@@ -87,10 +113,10 @@ describe("full compartment search", () => {
   });
 });
 
-interface FakeOptions { failOn?: (date: string) => boolean; onCarriages?: (date: string) => void; carGroups?: TrainRoute["carGroups"] }
+interface FakeOptions { failOn?: (date: string) => boolean; onCarriages?: (date: string) => void; carGroups?: TrainRoute["carGroups"]; onSchemeImage?: (...args: unknown[]) => void; schemeFails?: boolean }
 
 function clientWith(fixture: string, options: FakeOptions | ((date: string) => boolean) = {}): RzdClient {
-  const { failOn = () => false, onCarriages = () => {}, carGroups = [{ carType: "Compartment", availablePlaces: 4, raw: {} }] } = typeof options === "function" ? { failOn: options } as FakeOptions : options;
+  const { failOn = () => false, onCarriages = () => {}, carGroups = [{ carType: "Compartment", availablePlaces: 4, raw: {} }], onSchemeImage = () => {}, schemeFails = false } = typeof options === "function" ? { failOn: options } as FakeOptions : options;
   let departureDate = "";
   const api = {
     async getTrainRoutes(input: { departureDate: string }): Promise<TrainRoute[]> {
@@ -104,6 +130,11 @@ function clientWith(fixture: string, options: FakeOptions | ((date: string) => b
       const transport = { requestJson: async () => payload, close() {} } as unknown as RzdTransport;
       return new RzdApi(makeConfig(), transport).getCarriages("2000000", "2034130", "2026-09-01T01:00:00", "002Э", "P1");
     },
+    async getCarScheme() {
+      if (schemeFails) throw new Error("scheme unavailable");
+      return { schemeId: 552, imageUrls: [{ kind: "PcFirstStorey", url: "https://ticket.rzd.ru/api/v1/carscheme/image/552/PcFirstStorey" }], raw: {} };
+    },
+    async getSchemeImage(...args: unknown[]) { onSchemeImage(...args); return { data: "UE5H", mimeType: "image/png" }; },
     close() {},
   } as unknown as RzdApi;
   return new RzdClient({}, api);

@@ -1,9 +1,9 @@
 import { RzdApi, type SchemeImageKind } from "./api.js";
 import type { SchemePlaces } from "./raster.js";
-import { findFullCompartments, type FullCompartmentCandidate, type FullCompartmentMatch, type FullCompartmentSearch } from "./compartments.js";
+import { findFullCompartments, type FullCompartmentCandidate, type FullCompartmentMatch, type FullCompartmentSearch, type SearchImage } from "./compartments.js";
 import { makeConfig, type RzdConfig } from "./config.js";
 import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.js";
-import type { CarImagesResult, CarriageResult, CarScheme, SchemeImageContent, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
+import type { Carriage, CarImagesResult, CarriageResult, CarScheme, SchemeImageContent, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
 
 type DateInput = string | Date;
 type CacheEntry = { at: number; stations: Station[] };
@@ -53,9 +53,9 @@ export class RzdClient {
    *  bounded twice over: a train whose compartment groups are all smaller than the party
    *  cannot hold the compartment and is never opened, and the scan stops at a request budget,
    *  naming the dates it never reached rather than passing them off as empty. */
-  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number } = {}): Promise<FullCompartmentSearch> {
+  async searchFullCompartments(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput, options: { adults?: number; places?: number; maxResults?: number; maxRequests?: number; image?: boolean } = {}): Promise<FullCompartmentSearch> {
     this.#ensureOpen();
-    const { places = 4, adults = places, maxResults = 3, maxRequests = 150 } = options;
+    const { places = 4, adults = places, maxResults = 3, maxRequests = 150, image = true } = options;
     if (!Number.isInteger(places) || places < 2) throw new RzdValidationError("places must be an integer of at least two.");
     if (!Number.isInteger(maxResults) || maxResults < 1) throw new RzdValidationError("maxResults must be an integer greater than zero.");
     if (!Number.isInteger(maxRequests) || maxRequests < 1) throw new RzdValidationError("maxRequests must be an integer greater than zero.");
@@ -64,6 +64,7 @@ export class RzdClient {
     const dates = dateRange(start, end);
     if (dates.length > 31) throw new RzdValidationError("The date range must not exceed 31 days.");
     const confirmed: FullCompartmentMatch[] = [], candidates: FullCompartmentCandidate[] = [], errors: { date: string; error: string }[] = [];
+    let firstCar: { car: Carriage; date: string; time: string; train: string } | undefined;
     let truncated = false, requests = 0, index = 0;
     for (; index < dates.length; index++) {
       const date = dates[index]!;
@@ -77,7 +78,12 @@ export class RzdClient {
           if (!canHoldCompartment(route, places)) continue;
           if (requests >= maxRequests) { truncated = true; break; }
           requests++;
-          const scan = findFullCompartments(await this.getCarriages(from, to, date, departureTime, route.number, route.provider ?? "P1"), places);
+          const carriages = await this.getCarriages(from, to, date, departureTime, route.number, route.provider ?? "P1");
+          const scan = findFullCompartments(carriages, places);
+          if (!firstCar && scan.confirmed[0]) {
+            const car = carriages.cars.find((entry) => entry.number === scan.confirmed[0]!.carNumber && entry.carType === "Compartment");
+            if (car) firstCar = { car, date, time: departureTime, train: route.number };
+          }
           confirmed.push(...scan.confirmed.map((match) => ({ date, trainNumber: route.number, departureTime: route.departureTime, arrivalTime: route.arrivalTime, ...match })));
           candidates.push(...scan.candidates.map((candidate) => ({ date, trainNumber: route.number, ...candidate })));
           if (confirmed.length >= maxResults) { truncated = true; break; }
@@ -86,10 +92,24 @@ export class RzdClient {
     }
     return {
       dateFrom: dates[0]!, dateTo: dates[dates.length - 1]!, places,
+      ...(image && confirmed[0] && firstCar ? await this.#drawCompartment(confirmed[0], firstCar) : {}),
       confirmed: confirmed.slice(0, maxResults), candidates: candidates.slice(0, maxResults),
       omitted: { confirmed: Math.max(0, confirmed.length - maxResults), candidates: Math.max(0, candidates.length - maxResults) },
       errors, unchecked: dates.slice(index), requests, truncated, checkedAt: moscowTimestamp(new Date()),
     };
+  }
+
+  /** The drawing is fetched without being asked for: an answer about which berths sit behind
+   *  one door is exactly what a picture settles, and a client left to find one on its own
+   *  illustrates the reply with photographs of some other carriage. */
+  async #drawCompartment(match: FullCompartmentMatch, source: { car: Carriage; date: string; time: string; train: string }): Promise<{ image?: SearchImage }> {
+    try {
+      const car = source.car;
+      const scheme = await this.getCarScheme(source.date, source.time, source.train, car.number!, car.carSubType!, car.serviceClass!, car.carrier!, car.numeration ?? "FromHead");
+      if (scheme.schemeId === undefined) return {};
+      const content = await this.getSchemeImage(scheme.schemeId, "PcFirstStorey", { free: match.places });
+      return { image: { ...content, carNumber: match.carNumber, compartmentNumber: match.compartmentNumber } };
+    } catch { return {}; }
   }
 
   async getTrainAvailability(from: string | number, to: string | number, dateFrom: DateInput, dateTo: DateInput): Promise<TrainAvailabilityResult> { const start = parseDateTime(dateFrom, "dateFrom"), end = parseDateTime(dateTo, "dateTo"); if (end < start) throw new RzdValidationError("dateTo must not be earlier than dateFrom."); const [origin, destination] = await this.#resolveDirection(from, to); return this.api.getTrainAvailability(origin, destination, datePart(start), datePart(end)); }
