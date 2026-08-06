@@ -1,5 +1,5 @@
 import { createMcpHandler } from "mcp-handler";
-import { registerMcpTools } from "./src/mcp-server.js";
+import { registerMcpTools, serverInstructions } from "./src/mcp-server.js";
 
 export const runtime = "nodejs";
 
@@ -7,7 +7,7 @@ const handler = createMcpHandler((server) => {
   registerMcpTools(server as unknown as Parameters<typeof registerMcpTools>[0]);
 }, {
   serverInfo: { name: "RZD API", version: "4.0.0" },
-  instructions: "Use these read-only tools to search the unofficial ticket.rzd.ru API.",
+  instructions: serverInstructions,
 });
 
 async function fetch(request: Request): Promise<Response> {

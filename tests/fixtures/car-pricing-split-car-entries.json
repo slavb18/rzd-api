@@ -1,0 +1,49 @@
+{
+  "OriginCode": "2000000",
+  "DestinationCode": "2034130",
+  "RoutePolicy": "Undefined",
+  "BookingSystem": "RZD",
+  "AllowedDocumentTypes": ["RussianPassport"],
+  "TrainInfo": {
+    "TrainNumber": "002Э",
+    "DepartureDateTime": "2026-09-30T01:00:00",
+    "LocalDepartureDateTime": "2026-09-30T01:00:00"
+  },
+  "Cars": [
+    {
+      "CarNumber": "11",
+      "CarType": "Compartment",
+      "CarTypeName": "Купе",
+      "CarSubType": "75К",
+      "ServiceClass": "2К",
+      "Carrier": "ФПК",
+      "MinPrice": 17306.6,
+      "MaxPrice": 17306.6,
+      "PlaceQuantity": 2,
+      "FreePlaces": "21, 23",
+      "Services": [],
+      "FreePlacesByCompartments": [{ "CompartmentNumber": "6", "Places": "21, 23" }]
+    },
+    {
+      "CarNumber": "11",
+      "CarType": "Compartment",
+      "CarTypeName": "Купе",
+      "CarSubType": "75К",
+      "ServiceClass": "2К",
+      "Carrier": "ФПК",
+      "MinPrice": 17306.6,
+      "MaxPrice": 17306.6,
+      "PlaceQuantity": 2,
+      "FreePlaces": "22, 24",
+      "Services": [],
+      "FreePlacesByCompartments": [{ "CompartmentNumber": "6", "Places": "22, 24" }]
+    },
+    {
+      "CarNumber": "11",
+      "CarType": "Baggage",
+      "CarSubType": "75К",
+      "Carrier": "ФПК",
+      "Services": []
+    }
+  ]
+}

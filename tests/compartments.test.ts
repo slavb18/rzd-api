@@ -36,6 +36,12 @@ describe("full compartment detection", () => {
     expect(scan.confirmed).toEqual([{ carNumber: "10", compartmentNumber: "9", places: [33, 34, 35, 36], placeLabels: ["33Ж", "34Ж", "35Ж", "36Ж"], serviceClass: "2К", minPrice: 18200, maxPrice: 18900, totalPrice: 72800 }]);
   });
 
+  test("joins the tariff entries of one carriage before judging its compartments", async () => {
+    const scan = findFullCompartments(await carriages("car-pricing-split-car-entries"));
+    expect(scan.confirmed).toEqual([{ carNumber: "11", compartmentNumber: "6", places: [21, 22, 23, 24], placeLabels: ["21", "22", "23", "24"], serviceClass: "2К", minPrice: 17306.6, maxPrice: 17306.6, totalPrice: 69226.4 }]);
+    expect(scan.candidates).toEqual([]);
+  });
+
   test("never confirms a compartment the raw response does not list with four free places", async () => {
     for (const fixture of fixtures) {
       const result = await carriages(fixture);

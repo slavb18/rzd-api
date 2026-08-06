@@ -7,10 +7,17 @@ import { configFromEnvironment } from "./config.js";
 const station = z.string().describe("Station name or numeric station code");
 const date = z.string().describe("Date in DD.MM.YYYY, YYYY-MM-DD, or ISO format");
 
+/** Reaches every client at initialize, so it carries the two choices a model gets wrong when
+ *  it has only tool names to go by: which tool answers "a whole compartment", and which one
+ *  can actually show a picture. */
+export const serverInstructions = [
+  "Use these read-only tools to search the unofficial ticket.rzd.ru API. Dates must not be in the past, and both availability and the internal RZD response schemas change without notice.",
+  "For a whole compartment - four berths behind one door rather than four berths somewhere in the same carriage - call search_full_compartments. It answers that question from the carriage response instead of leaving it to inference, and returns the nearest few dates.",
+  "To show the carriage, call get_car_scheme with include_image and the compartment's berths in free_places: it returns the drawing as a PNG with those berths filled blue. get_car_images returns titles and identifiers only, its paths do not resolve to an image, and photographs found elsewhere are not evidence about this carriage.",
+].join("\n\n");
+
 export function createMcpServer(): McpServer {
-  const server = new McpServer({ name: "RZD API", version: "4.0.0" }, {
-    instructions: "Use these read-only tools to search the unofficial ticket.rzd.ru API. Dates must not be in the past. Search results and internal RZD response schemas can change without notice.",
-  });
+  const server = new McpServer({ name: "RZD API", version: "4.0.0" }, { instructions: serverInstructions });
 
   registerMcpTools(server);
   return server;
@@ -41,7 +48,7 @@ export function registerMcpTools(server: ToolServer): void {
     const { image: _omitted, ...scheme } = value as Record<string, unknown>;
     return [{ type: "text" as const, text: JSON.stringify(scheme, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
   });
-  register(server, "get_car_images", "Get carriage image metadata.", metadata, async (args) => usingClient((client) => client.getCarImages(args.departure_date, args.departure_time, args.train_number, args.car_number, args.car_sub_type, args.service_class, args.carrier, args.car_numeration)));
+  register(server, "get_car_images", "List the interior photographs the carriage has: titles and identifiers only. The paths it returns do not resolve to an image, so it cannot illustrate an answer - use get_car_scheme with include_image for a picture of the carriage.", metadata, async (args) => usingClient((client) => client.getCarImages(args.departure_date, args.departure_time, args.train_number, args.car_number, args.car_sub_type, args.service_class, args.carrier, args.car_numeration)));
   register(server, "get_route_stations", "Get all stations for a train and direction.", { from_station: station, to_station: station, departure_date: date, departure_time: z.string(), train_number: z.string(), provider: z.string().default("P1") }, async (args) => usingClient((client) => client.getRouteStations(args.from_station, args.to_station, args.departure_date, args.departure_time, args.train_number, args.provider)));
 }
 
