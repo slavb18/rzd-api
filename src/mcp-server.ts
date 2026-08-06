@@ -52,11 +52,12 @@ export function registerMcpTools(server: ToolServer): void {
 /** Splits a result carrying an `image` into a text block and a real image block, so the
  *  drawing arrives as a picture rather than as base64 buried in JSON. */
 function imageAndText(value: unknown): ContentBlock[] {
-  const image = (value as { image?: { data: string; mimeType: string; url?: string } }).image;
+  const image = (value as { image?: { data: string; mimeType: string; url?: string; carNumber?: string; compartmentNumber?: string } }).image;
   const { image: _omitted, ...rest } = value as Record<string, unknown>;
-  // The link stays in the text: a client that drops image blocks would otherwise be left with
-  // nothing to show, and goes looking for a photograph of some other carriage instead.
-  const described = image ? { ...rest, image: { ...image, data: undefined, mimeType: undefined } } : rest;
+  // The link stays in the text, and goes first: a client that drops image blocks would
+  // otherwise have nothing to show, and one that truncates a long result would cut the link
+  // off the end - both send it looking for a photograph of some other carriage instead.
+  const described = image ? { image: { url: image.url, carNumber: image.carNumber, compartmentNumber: image.compartmentNumber }, ...rest } : rest;
   return [{ type: "text", text: JSON.stringify(described, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
 }
 
