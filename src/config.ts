@@ -42,10 +42,19 @@ export function makeConfig(config: Partial<RzdConfig> = {}): RzdConfig {
   return value;
 }
 
+/** A serverless invocation is cut off by the platform long before a 25s timeout with retries
+ *  can finish, so a stuck upstream burns the whole budget and the caller gets nothing back but
+ *  a dead connection. Running on Vercel, fail fast instead and let the error reach the model. */
+const serverlessDefaults = { timeoutMs: 8_000, retryTotal: 1 };
+
 export function configFromEnvironment(
   env: Record<string, string | undefined> = process.env,
 ): Partial<RzdConfig> {
+  const serverless = env.VERCEL ? serverlessDefaults : {};
   return {
+    ...serverless,
+    ...(env.RZD_TIMEOUT_MS ? { timeoutMs: Number(env.RZD_TIMEOUT_MS) } : {}),
+    ...(env.RZD_RETRY_TOTAL ? { retryTotal: Number(env.RZD_RETRY_TOTAL) } : {}),
     ...(env.RZD_BASE_URL ? { baseUrl: env.RZD_BASE_URL } : {}),
     ...(env.RZD_B2B_BASE_URL ? { b2bBaseUrl: env.RZD_B2B_BASE_URL } : {}),
     ...(env.RZD_SCHEME_IMAGE_BASE_URL ? { schemeImageBaseUrl: env.RZD_SCHEME_IMAGE_BASE_URL } : {}),

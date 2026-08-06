@@ -15,6 +15,13 @@ describe("configuration", () => {
     expect(configFromEnvironment({ RZD_INSECURE_TLS: "1" })).toEqual({ insecureTls: true });
     expect(configFromEnvironment({ RZD_INSECURE_TLS: "0" })).toEqual({});
   });
+  test("fails fast when it runs as a serverless function", () => {
+    expect(configFromEnvironment({ VERCEL: "1" })).toEqual({ timeoutMs: 8_000, retryTotal: 1 });
+    expect(configFromEnvironment({})).toEqual({});
+  });
+  test("lets the environment override the serverless timeout", () => {
+    expect(configFromEnvironment({ VERCEL: "1", RZD_TIMEOUT_MS: "3000", RZD_RETRY_TOTAL: "0" })).toEqual({ timeoutMs: 3_000, retryTotal: 0 });
+  });
   test("reads endpoint overrides from environment", () => {
     expect(configFromEnvironment({
       RZD_BASE_URL: "https://proxy.example/api/",
