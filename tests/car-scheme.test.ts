@@ -59,6 +59,13 @@ describe("carriage scheme images", () => {
     expect(painted).toContain("#Seat10{fill:#E21A1A");
   });
 
+  test("keeps the number white on a painted berth and dark on an untouched one", async () => {
+    const svg = `<svg><text class="st7 st8 st9">33</text><text class="st7 st8 st9">31</text></svg>`;
+    const painted = paint(svg, { free: [33] });
+    expect(painted).toContain(`<text class="st7 st8 st9" style="fill:#FFFFFF">33</text>`);
+    expect(painted).toContain(`<text class="st7 st8 st9">31</text>`);
+  });
+
   test("darkens the place numbers even when no places are painted", async () => {
     const painted = paint("<svg><path id=\"Seat1\"/></svg>", {});
     expect(painted).toContain(".st7{fill:#2B3038}");

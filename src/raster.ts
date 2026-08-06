@@ -8,9 +8,11 @@ export type Rasterizer = (svg: string, places?: SchemePlaces) => Promise<Uint8Ar
  *  the site itself shows are filled here: blue for free places, red for the ones being offered. */
 const fills = { free: { fill: "#4A90E2", stroke: "#2F6FBF" }, selected: { fill: "#E21A1A", stroke: "#B31414" } };
 
-/** The place numbers are drawn white, legible only once the site has filled the berth with a
- *  colour. Darkening them keeps every number readable, painted or not. */
+/** The numbers are drawn white, legible only once the site has filled the berth with a colour.
+ *  Darkening them makes the untouched berths readable; the painted ones get their white back,
+ *  matched by the number the text node carries. */
 const numberFill = ".st7{fill:#2B3038}";
+const paintedNumberFill = "#FFFFFF";
 
 /** Renders the whole carriage: cropping to a compartment would force resvg to rasterise the
  *  full car at the zoom factor first, which costs seconds, and it hides the neighbouring
@@ -33,7 +35,10 @@ export function paint(svg: string, places: SchemePlaces): string {
     const seats = places[state] ?? [];
     return seats.length ? [`${seats.map((place) => `#Seat${place}`).join(",")}{fill:${fills[state].fill};stroke:${fills[state].stroke}}`] : [];
   });
-  return svg.replace("</svg>", `<style>${numberFill}${rules.join("")}</style></svg>`);
+  const painted = new Set([...(places.free ?? []), ...(places.selected ?? [])]);
+  const drawing = painted.size === 0 ? svg : svg.replace(/<text([^>]*)>(\d+)<\/text>/g,
+    (node, attributes: string, number: string) => painted.has(Number(number)) ? `<text${attributes} style="fill:${paintedNumberFill}">${number}</text>` : node);
+  return drawing.replace("</svg>", `<style>${numberFill}${rules.join("")}</style></svg>`);
 }
 
 async function loadRenderer(): Promise<Renderer | null> {
