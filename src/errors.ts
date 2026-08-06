@@ -25,4 +25,4 @@ export class RzdAmbiguousStationError extends RzdValidationError {
   }
 }
 
-import type { Station } from "./models.ts";
+import type { Station } from "./models.js";

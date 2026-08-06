@@ -17,10 +17,13 @@
     "typecheck": "tsc --noEmit",
     "check": "bun run typecheck && bun test"
   },
-  "engines": { "bun": ">=1.2.0" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
-    "zod": "^3.25.0"
+    "mcp-handler": "^2.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -1,4 +1,4 @@
-import { RzdValidationError } from "./errors.ts";
+import { RzdValidationError } from "./errors.js";
 
 export interface RzdConfig {
   language: "ru" | "en";

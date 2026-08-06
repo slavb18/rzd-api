@@ -1,6 +1,6 @@
-import { RzdApiError, RzdHttpError, RzdTransportError, RzdValidationError } from "./errors.ts";
-import type { RzdConfig } from "./config.ts";
-import type { JsonObject } from "./models.ts";
+import { RzdApiError, RzdHttpError, RzdTransportError, RzdValidationError } from "./errors.js";
+import type { RzdConfig } from "./config.js";
+import type { JsonObject } from "./models.js";
 
 export type JsonPayload = JsonObject | unknown[];
 

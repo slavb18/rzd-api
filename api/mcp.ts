@@ -1,5 +1,14 @@
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createMcpServer } from "../src/mcp-server.ts";
+import { createMcpHandler } from "mcp-handler";
+import { registerMcpTools } from "../src/mcp-server.js";
+
+export const runtime = "nodejs";
+
+const handler = createMcpHandler((server) => {
+  registerMcpTools(server as unknown as Parameters<typeof registerMcpTools>[0]);
+}, {
+  serverInfo: { name: "RZD API", version: "4.0.0" },
+  instructions: "Use these read-only tools to search the unofficial ticket.rzd.ru API.",
+});
 
 async function fetch(request: Request): Promise<Response> {
   if (!isAuthorized(request)) {
@@ -9,11 +18,8 @@ async function fetch(request: Request): Promise<Response> {
     });
   }
 
-  const transport = new WebStandardStreamableHTTPServerTransport();
-  const server = createMcpServer();
   try {
-    await server.connect(transport);
-    return await transport.handleRequest(request);
+    return await handler(request);
   } catch (error) {
     console.error("MCP request failed", error);
     return Response.json({

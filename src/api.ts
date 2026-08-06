@@ -1,7 +1,7 @@
-import type { RzdConfig } from "./config.ts";
-import { RzdSchemaError } from "./errors.ts";
-import type { CarGroup, CarImagesResult, Carriage, CarriageResult, CarScheme, JsonObject, MinimalPricingResult, RouteStation, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute } from "./models.ts";
-import { isObject, RzdTransport, type JsonPayload } from "./transport.ts";
+import type { RzdConfig } from "./config.js";
+import { RzdSchemaError } from "./errors.js";
+import type { CarGroup, CarImagesResult, Carriage, CarriageResult, CarScheme, JsonObject, MinimalPricingResult, RouteStation, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute } from "./models.js";
+import { isObject, RzdTransport, type JsonPayload } from "./transport.js";
 
 export class RzdApi {
   readonly baseUrl: string;

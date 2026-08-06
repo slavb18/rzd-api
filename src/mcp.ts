@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createMcpServer } from "./mcp-server.ts";
+import { createMcpServer } from "./mcp-server.js";
 
 class RateLimiter {
   readonly requests = new Map<string, number[]>();

@@ -1,7 +1,7 @@
-import { RzdApi } from "./api.ts";
-import { makeConfig, type RzdConfig } from "./config.ts";
-import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.ts";
-import type { CarImagesResult, CarriageResult, CarScheme, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.ts";
+import { RzdApi } from "./api.js";
+import { makeConfig, type RzdConfig } from "./config.js";
+import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.js";
+import type { CarImagesResult, CarriageResult, CarScheme, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
 
 type DateInput = string | Date;
 type CacheEntry = { at: number; stations: Station[] };

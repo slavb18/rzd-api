@@ -8,7 +8,7 @@ afterEach(() => {
   else process.env.MCP_AUTH_TOKEN = originalToken;
 });
 
-describe("Vercel Bun functions", () => {
+describe("Vercel functions", () => {
   test("exposes a health response", async () => {
     const response = health.fetch();
     expect(response.status).toBe(200);
@@ -24,6 +24,21 @@ describe("Vercel Bun functions", () => {
     }));
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('"serverInfo"');
+  });
+
+  test("exposes all MCP tools", async () => {
+    delete process.env.MCP_AUTH_TOKEN;
+    const response = await mcp.fetch(new Request("https://example.vercel.app/api/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    }));
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    for (const name of [
+      "search_tickets", "find_stations", "get_carriages", "get_train_availability",
+      "get_minimal_prices", "get_car_scheme", "get_car_images", "get_route_stations",
+    ]) expect(body).toContain(`\"name\":\"${name}\"`);
   });
 
   test("honors an optional bearer token", async () => {
