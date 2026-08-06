@@ -89,16 +89,11 @@ docker compose up -d
 
 Проект содержит Vercel Functions без web-фреймворка:
 
-- `https://<project>.vercel.app/api/mcp` — Streamable HTTP MCP;
-- `https://<project>.vercel.app/api/health` — healthcheck.
+- `https://<project>.vercel.app/mcp` — публичный Streamable HTTP MCP;
+- `https://<project>.vercel.app/health` — healthcheck.
 
-Для закрытого MCP задайте `MCP_AUTH_TOKEN` в настройках Vercel. Без этой
-переменной endpoint публичный.
-
-Vercel entrypoint использует официальный `mcp-handler` и Node.js runtime.
-Основной пакет, локальный HTTP-сервер, STDIO MCP, тесты и package manager
-остаются на Bun. Текущий Vercel Bun Runtime завершается при обработке
-Streamable HTTP MCP, поэтому `bunVersion` намеренно не включён.
+Vercel entrypoint использует Elysia, официальный `mcp-handler` и Bun Runtime.
+Маршруты принадлежат самому приложению; Vercel rewrites не используются.
 
 ```sh
 vercel deploy

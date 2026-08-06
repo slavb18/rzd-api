@@ -10,5 +10,5 @@
     "allowImportingTsExtensions": true,
     "types": ["bun"]
   },
-  "include": ["src/**/*.ts", "api/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "app.ts", "mcp.ts", "tests/**/*.ts"]
 }

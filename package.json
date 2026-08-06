@@ -18,10 +18,11 @@
     "check": "bun run typecheck && bun test"
   },
   "engines": {
-    "node": ">=20"
+    "bun": ">=1.2.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
+    "elysia": "^1.4.29",
     "mcp-handler": "^2.1.0",
     "zod": "^4.4.3"
   },
