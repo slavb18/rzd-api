@@ -33,3 +33,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 .vercel
+
+# local MCP wiring for testing this server in Claude Code
+.mcp.json

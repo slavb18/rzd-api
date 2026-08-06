@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod/v4";
+import { schemeImageKinds } from "./api.js";
 import { RzdClient } from "./client.js";
 import { configFromEnvironment } from "./config.js";
 
@@ -29,15 +30,26 @@ export function registerMcpTools(server: ToolServer): void {
   register(server, "get_train_availability", "Get dates with available trains for a direction.", { from_station: station, to_station: station, date_from: date, date_to: date }, async (args) => usingClient((client) => client.getTrainAvailability(args.from_station, args.to_station, args.date_from, args.date_to)));
   register(server, "get_minimal_prices", "Get the minimum published prices from a selected date.", { from_station: station, to_station: station, date_from: date }, async (args) => usingClient((client) => client.getMinimalPrices(args.from_station, args.to_station, args.date_from)));
   const metadata = { departure_date: date, departure_time: z.string(), train_number: z.string(), car_number: z.string(), car_sub_type: z.string(), service_class: z.string(), carrier: z.string(), car_numeration: z.string().default("FromHead") };
-  register(server, "get_car_scheme", "Get carriage scheme metadata.", metadata, async (args) => usingClient((client) => client.getCarScheme(args.departure_date, args.departure_time, args.train_number, args.car_number, args.car_sub_type, args.service_class, args.carrier, args.car_numeration)));
+  register(server, "get_car_scheme", "Get carriage scheme metadata, including public links to the scheme drawing. Set include_image to embed the drawing as a PNG; free_places are filled blue and selected_places red, matching the colours ticket.rzd.ru uses.", {
+    ...metadata, include_image: z.boolean().default(false), image_kind: z.enum(schemeImageKinds).default("PcFirstStorey"), free_places: z.array(z.number().int().min(1)).default([]).describe("Place numbers to fill blue, the colour the site uses for a free berth"), selected_places: z.array(z.number().int().min(1)).default([]).describe("Place numbers to fill red, the colour the site uses for the berths being booked"),
+  }, async (args) => usingClient(async (client) => {
+    const scheme = await client.getCarScheme(args.departure_date, args.departure_time, args.train_number, args.car_number, args.car_sub_type, args.service_class, args.carrier, args.car_numeration);
+    if (!args.include_image || scheme.schemeId === undefined || !scheme.imageUrls.some((image) => image.kind === args.image_kind)) return scheme;
+    return { ...scheme, image: await client.getSchemeImage(scheme.schemeId, args.image_kind, { free: args.free_places, selected: args.selected_places }) };
+  }), (value) => {
+    const image = (value as { image?: { data: string; mimeType: string } }).image;
+    const { image: _omitted, ...scheme } = value as Record<string, unknown>;
+    return [{ type: "text" as const, text: JSON.stringify(scheme, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
+  });
   register(server, "get_car_images", "Get carriage image metadata.", metadata, async (args) => usingClient((client) => client.getCarImages(args.departure_date, args.departure_time, args.train_number, args.car_number, args.car_sub_type, args.service_class, args.carrier, args.car_numeration)));
   register(server, "get_route_stations", "Get all stations for a train and direction.", { from_station: station, to_station: station, departure_date: date, departure_time: z.string(), train_number: z.string(), provider: z.string().default("P1") }, async (args) => usingClient((client) => client.getRouteStations(args.from_station, args.to_station, args.departure_date, args.departure_time, args.train_number, args.provider)));
 }
 
 type Shape = Record<string, z.ZodTypeAny>;
-function register<S extends Shape>(server: ToolServer, name: string, description: string, inputSchema: S, handler: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>): void {
+type ContentBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+function register<S extends Shape>(server: ToolServer, name: string, description: string, inputSchema: S, handler: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>, toContent: (value: unknown) => ContentBlock[] = (value) => [{ type: "text", text: JSON.stringify(value, null, 2) }]): void {
   server.registerTool(name, { description, inputSchema: z.object(inputSchema), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } } as never, (async (args: Record<string, unknown>) => {
-    try { const value = await handler(args as z.infer<z.ZodObject<S>>); return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] }; }
+    try { return { content: toContent(await handler(args as z.infer<z.ZodObject<S>>)) }; }
     catch (error) { return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true }; }
   }) as never);
 }

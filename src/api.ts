@@ -1,12 +1,16 @@
 import type { RzdConfig } from "./config.js";
-import { RzdSchemaError } from "./errors.js";
-import type { CarGroup, CarImagesResult, Carriage, CarriageResult, CarScheme, JsonObject, MinimalPricingResult, RouteStation, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute } from "./models.js";
+import { RzdSchemaError, RzdValidationError } from "./errors.js";
+import type { CarGroup, CarImagesResult, Carriage, CarriageResult, CarScheme, JsonObject, MinimalPricingResult, RouteStation, RouteStationsResult, SchemeImage, SchemeImageContent, Station, TrainAvailabilityResult, TrainRoute } from "./models.js";
+
+export const schemeImageKinds = ["PcFirstStorey", "PcSecondStorey", "MobileFirstStoreyVert", "MobileSecondStoreyVert"] as const;
+export type SchemeImageKind = (typeof schemeImageKinds)[number];
+import { renderScheme, type Rasterizer, type SchemePlaces } from "./raster.js";
 import { isObject, RzdTransport, type JsonPayload } from "./transport.js";
 
 export class RzdApi {
   readonly baseUrl: string;
   readonly b2bBaseUrl: string;
-  constructor(readonly config: RzdConfig, readonly transport = new RzdTransport(config)) {
+  constructor(readonly config: RzdConfig, readonly transport = new RzdTransport(config), readonly rasterize: Rasterizer = renderScheme) {
     this.baseUrl = config.baseUrl.replace(/\/$/, "");
     const site = new URL(this.baseUrl).origin;
     this.b2bBaseUrl = (config.b2bBaseUrl ?? `${site}/apib2b/p`).replace(/\/$/, "");
@@ -41,7 +45,17 @@ export class RzdApi {
     const docs = root.AllowedDocumentTypes; if (!Array.isArray(docs) || !docs.every((v) => typeof v === "string")) throw new RzdSchemaError("Invalid AllowedDocumentTypes field.");
     return { cars: carNodes(root).map(parseCarriage), trainNumber: stringValue(info, "TrainNumber"), originCode: stringValue(root, "OriginCode"), destinationCode: stringValue(root, "DestinationCode"), departureTime: stringValue(info, "DepartureDateTime", "LocalDepartureDateTime"), routePolicy: stringValue(root, "RoutePolicy"), bookingSystem: stringValue(root, "BookingSystem"), allowedDocumentTypes: docs, originRetrievalDate: stringValue(root, "OriginRetrievalDate"), raw: root };
   }
-  async getCarScheme(params: Record<string, string>): Promise<CarScheme> { const root = objectPayload(await this.transport.requestJson("GET", `${this.baseUrl}/railway-service/carscheme`, { params: metadataParams(params) }), "car scheme"); return parseCarScheme(root); }
+  async getCarScheme(params: Record<string, string>): Promise<CarScheme> { const root = objectPayload(await this.transport.requestJson("GET", `${this.baseUrl}/railway-service/carscheme`, { params: metadataParams(params) }), "car scheme"); return parseCarScheme(root, this.config.schemeImageBaseUrl); }
+
+  /** Bytes come through the configured endpoint so a deployment behind a private proxy can
+   *  read them; only the public link built in parseCarScheme is ever handed to a user. */
+  async getSchemeImage(schemeId: number, kind: SchemeImageKind, places: SchemePlaces = {}): Promise<SchemeImageContent> {
+    if (!Number.isInteger(schemeId) || schemeId < 0) throw new RzdValidationError("schemeId must be a non-negative integer.");
+    if (!schemeImageKinds.includes(kind)) throw new RzdValidationError(`Unsupported scheme image kind: ${String(kind)}`);
+    const image = await this.transport.requestBytes(`${this.baseUrl}/carscheme/image/${schemeId}/${kind}`);
+    const png = image.mimeType === "image/svg+xml" ? await this.rasterize(Buffer.from(image.data).toString("utf8"), places) : null;
+    return png ? { data: Buffer.from(png).toString("base64"), mimeType: "image/png" } : { data: Buffer.from(image.data).toString("base64"), mimeType: image.mimeType };
+  }
   async getCarImages(params: Record<string, string>): Promise<CarImagesResult> { const root = objectPayload(await this.transport.requestJson("GET", `${this.baseUrl}/railway-service/carimage/list`, { params: metadataParams(params) }), "car images"); return { schemeId: integerValue(root, "SchemeId"), carSubType: stringValue(root, "CarSubType"), images: objectList(root, "Images", "car images").map((node) => ({ imageId: integerValue(node, "RailwayCarImageId"), titleRu: stringValue(node, "TitleRu"), titleEn: stringValue(node, "TitleEn"), preview: stringValue(node, "Preview"), content: stringValue(node, "Content"), sequenceNumber: integerValue(node, "SequenceNumber"), raw: node })), raw: root }; }
   async getRouteStations(origin: string, destination: string, departureDate: string, trainNumber: string, provider: string): Promise<RouteStationsResult> {
     const root = objectPayload(await this.transport.requestJson("GET", `${this.b2bBaseUrl}/Railway/V1/Search/TrainRoute`, { params: { TrainNumber: trainNumber, Origin: origin, Destination: destination, DepartureDate: departureDate, Provider: provider, GetNewRoute: true, service_provider: "B2B_RZD" } }), "route stations");
@@ -57,7 +71,21 @@ function suggestionNodes(payload: JsonPayload): unknown[] { if (Array.isArray(pa
 function parseStationNodes(nodes: unknown[]): Station[] { const out: Station[] = []; for (const node of nodes) { if (!isObject(node)) throw new RzdSchemaError("Invalid station node."); const code = stringValue(node, "ExpressCode", "expressCode", "code", "Code", "c"); const name = stringValue(node, "NameRu", "nameRu", "name", "Name", "n", "title"); if (code && name) out.push({ name, code, raw: node, nodeId: stringValue(node, "nodeId", "NodeId", "id", "Id"), nodeType: stringValue(node, "nodeType", "NodeType"), transportType: stringValue(node, "transportType", "TransportType"), region: stringValue(node, "region", "Region") }); else { const nested = ["stations", "items", "children", "Children"].flatMap((k) => Array.isArray(node[k]) ? node[k] as unknown[] : []); if (!nested.length) throw new RzdSchemaError("Unsupported station node."); out.push(...parseStationNodes(nested)); } } return out; }
 function carNodes(root: JsonObject): JsonObject[] { const nested = [root, root.data, root.Data].filter(isObject); const value = nested.flatMap((v) => [v.cars, v.Cars]).find((v) => v !== undefined); if (!Array.isArray(value) || !value.every(isObject)) throw new RzdSchemaError("The carriage response has no supported cars list."); return value; }
 function parseCarriage(node: JsonObject): Carriage { const services = node.Services ?? []; if (!Array.isArray(services) || !services.every((v) => typeof v === "string")) throw new RzdSchemaError("Invalid Services field."); return { number: stringValue(node, "CarNumber", "carNumber", "Number", "number"), carType: stringValue(node, "CarType", "carType", "Type", "type"), minPrice: numberValue(node, "MinPrice", "minPrice", "Price", "price"), availablePlaces: available(node), raw: node, maxPrice: numberValue(node, "MaxPrice"), serviceCost: numberValue(node, "ServiceCost"), carSubType: stringValue(node, "CarSubType"), carTypeName: stringValue(node, "CarTypeName"), serviceClass: stringValue(node, "ServiceClass"), serviceClassName: stringValue(node, "ServiceClassNameRu", "ServiceClassNameEn"), schemeId: integerValue(node, "RailwayCarSchemeId"), schemeName: stringValue(node, "CarSchemeName"), carrier: stringValue(node, "Carrier"), carrierDisplayName: stringValue(node, "CarrierDisplayName"), direction: stringValue(node, "CarDirection"), numeration: stringValue(node, "CarNumeration"), trainNumber: stringValue(node, "TrainNumber"), freePlaces: stringValue(node, "FreePlaces"), services, hasImages: booleanValue(node, "HasImages") }; }
-function parseCarScheme(node: JsonObject): CarScheme { return { schemeId: integerValue(node, "SchemeId"), carSubType: stringValue(node, "CarSubType"), startDate: stringValue(node, "StartDate"), endDate: stringValue(node, "EndDate"), trainNumber: stringValue(node, "TrainNumber"), carrier: stringValue(node, "Carrier"), carNumber: stringValue(node, "CarNumber"), serviceClass: stringValue(node, "ServiceClass"), firstStorey: stringValue(node, "PcSchemeFirstStorey"), secondStorey: stringValue(node, "PcSchemeSecondStorey"), mobileFirstStorey: stringValue(node, "MobileSchemeFirstVertStorey"), mobileSecondStorey: stringValue(node, "MobileSchemeSecondVertStorey"), direction: stringValue(node, "Direction"), raw: node }; }
+function parseCarScheme(node: JsonObject, imageBaseUrl: string): CarScheme { return { schemeId: integerValue(node, "SchemeId"), carSubType: stringValue(node, "CarSubType"), startDate: stringValue(node, "StartDate"), endDate: stringValue(node, "EndDate"), trainNumber: stringValue(node, "TrainNumber"), carrier: stringValue(node, "Carrier"), carNumber: stringValue(node, "CarNumber"), serviceClass: stringValue(node, "ServiceClass"), firstStorey: stringValue(node, "PcSchemeFirstStorey"), secondStorey: stringValue(node, "PcSchemeSecondStorey"), mobileFirstStorey: stringValue(node, "MobileSchemeFirstVertStorey"), mobileSecondStorey: stringValue(node, "MobileSchemeSecondVertStorey"), direction: stringValue(node, "Direction"), imageUrls: schemeImages(node, imageBaseUrl), raw: node }; }
+/** Paths come from the RZD response, so they are matched against the one shape the API uses
+ *  ("/552/PcFirstStorey") and the resolved URL is required to stay on the configured public
+ *  origin. A published link must never be able to point somewhere else. */
+function schemeImages(node: JsonObject, baseUrl: string): SchemeImage[] {
+  const base = baseUrl.replace(/\/$/, "");
+  return ["PcSchemeFirstStorey", "PcSchemeSecondStorey", "MobileSchemeFirstVertStorey", "MobileSchemeSecondVertStorey"].flatMap((field) => {
+    const path = stringValue(node, field);
+    const match = path === undefined ? null : /^\/\d+\/([A-Za-z]+)$/.exec(path);
+    const kind = match?.[1];
+    if (!kind || !schemeImageKinds.includes(kind as SchemeImageKind)) return [];
+    const url = new URL(`${base}${path}`);
+    return url.origin === new URL(base).origin ? [{ kind, url: url.toString() }] : [];
+  });
+}
 function parseRouteStation(node: JsonObject): RouteStation { return { name: stringValue(node, "StationName", "stationName", "Name", "name"), code: stringValue(node, "StationCode", "stationCode", "Code", "code"), arrivalTime: stringValue(node, "ArrivalDateTime", "arrivalDateTime", "ArrivalTime", "arrivalTime"), departureTime: stringValue(node, "DepartureDateTime", "departureDateTime", "DepartureTime", "departureTime"), distance: integerValue(node, "Distance", "distance"), raw: node, cityName: stringValue(node, "CityName"), localArrivalTime: stringValue(node, "LocalArrivalDateTime", "LocalArrivalTime"), localDepartureTime: stringValue(node, "LocalDepartureDateTime", "LocalDepartureTime"), stopDuration: numberValue(node, "StopDuration"), timeDescription: stringValue(node, "TimeDescription"), daysFromOrigin: integerValue(node, "DaysFromFormingStation"), timeZoneDifference: integerValue(node, "TimeZoneDifference"), actualMovement: booleanValue(node, "ActualMovement"), isCutawayStation: booleanValue(node, "IsCutawayStation") }; }
 function metadataParams(p: Record<string, string>): Record<string, string> { return { CarSubType: p.carSubType!, CarNumber: p.carNumber!, ServiceClass: p.serviceClass!, Carrier: p.carrier!, TrainNumber: p.trainNumber!, DepartureDate: p.departureDate!, CarNumeration: p.carNumeration! }; }
 function objectPayload(payload: JsonPayload, endpoint: string): JsonObject { if (!isObject(payload)) throw new RzdSchemaError(`The ${endpoint} response must be an object.`); return payload; }

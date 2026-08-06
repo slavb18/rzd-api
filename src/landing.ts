@@ -84,16 +84,16 @@ bun run mcp:http</code></pre>
 
   <section aria-labelledby="ask">
     <h2 id="ask">Как спрашивать</h2>
-    <p>Коротко:</p>
-    <pre><code>@rzd найди полное купе Москва — Владивосток на ближайшие даты</code></pre>
-    <p>Точнее — когда важен воспроизводимый ответ, а не первый попавшийся поезд:</p>
-    <pre><code>@rzd Проверь Москва → Владивосток с 7 августа по 30 сентября.
-Нужны 4 взрослых и именно четыре места в одном физическом купе,
-а не четыре места суммарно. Сначала календарь движения, затем
-поезда и конкретные вагоны. Если купе подтвердить не удалось,
-пометь результат как неподтверждённый. Покажи поезд, даты,
-класс, номера мест, цену за место и сумму.</code></pre>
-    <p class="hint">Ассистент вернёт подтверждённые купе и отдельно кандидатов — вагоны, где мест хватает, но API не подтвердил их одним купе. Ответ помечен временем проверки: наличие мест устаревает за минуты.</p>
+    <p>Обычным языком — параметры ассистент достроит сам:</p>
+    <dl class="examples">
+      <dt><code>@rzd Москва → Владивосток, полное купе, с 1 по 30 сентября 2026 с картинкой</code></dt>
+      <dd>«Полное купе» — это четыре места за одной дверью. Схема вагона придёт картинкой, свободные места на ней синие.</dd>
+      <dt><code>@rzd СВ на двоих Москва — Петербург в ближайшие выходные</code></dt>
+      <dd>В двухместном вагоне за дверью два места, а не четыре, поэтому искать нужно именно два — иначе не подтвердится ничего.</dd>
+      <dt><code>@rzd целое купе во Владивосток в сентябре</code></dt>
+      <dd>Голый месяц берётся целиком. Диапазон ограничен 31 днём: если попросить больше, ассистент проверит первые 31 и скажет об этом.</dd>
+    </dl>
+    <p class="hint">В ответе подтверждённые купе и отдельно кандидаты — вагоны, где мест хватает, но API не подтвердил их одним купе. Номера мест приходят как есть: <code>36Ж</code> — место в женском купе, <code>6С</code> — в смешанном. Ответ помечен временем проверки: наличие устаревает за минуты.</p>
   </section>
 
   <section aria-labelledby="tools">
@@ -202,6 +202,11 @@ pre code { font-size: 0.82rem; line-height: 1.65; }
 .card li { margin-bottom: 0.3rem; }
 .card-note { font-size: 0.85rem; color: var(--muted); }
 .hint { font-size: 0.92rem; color: var(--muted); }
+.examples { margin: 0 0 1rem; }
+.examples dt { margin-bottom: 0.4rem; padding: 0.7rem 0.9rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.examples dt code { font-size: 0.85rem; }
+.examples dd { margin: 0 0 1.4rem; padding-left: 0.9rem; border-left: 2px solid var(--line); font-size: 0.9rem; color: var(--muted); }
+.examples dd:last-child { margin-bottom: 0; }
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 400; }

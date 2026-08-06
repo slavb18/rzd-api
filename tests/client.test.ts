@@ -8,6 +8,13 @@ describe("configuration", () => {
   test("rejects invalid URLs", () => {
     expect(() => makeConfig({ baseUrl: "ftp://example.test" })).toThrow(RzdValidationError);
   });
+  test("verifies the upstream TLS certificate by default", () => {
+    expect(makeConfig().insecureTls).toBe(false);
+  });
+  test("allows a deployment behind a self-signed proxy to opt out explicitly", () => {
+    expect(configFromEnvironment({ RZD_INSECURE_TLS: "1" })).toEqual({ insecureTls: true });
+    expect(configFromEnvironment({ RZD_INSECURE_TLS: "0" })).toEqual({});
+  });
   test("reads endpoint overrides from environment", () => {
     expect(configFromEnvironment({
       RZD_BASE_URL: "https://proxy.example/api/",

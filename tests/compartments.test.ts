@@ -10,7 +10,7 @@ const fixtures = ["car-pricing-one-compartment", "car-pricing-split-compartments
 describe("full compartment detection", () => {
   test("confirms a compartment when one compartment holds all four free places", async () => {
     const scan = findFullCompartments(await carriages("car-pricing-one-compartment"));
-    expect(scan.confirmed).toEqual([{ carNumber: "07", compartmentNumber: "1", places: [1, 2, 3, 4], serviceClass: "2К", minPrice: 21481, maxPrice: 21481, totalPrice: 85924 }]);
+    expect(scan.confirmed).toEqual([{ carNumber: "07", compartmentNumber: "1", places: [1, 2, 3, 4], placeLabels: ["1", "2", "3", "4"], serviceClass: "2К", minPrice: 21481, maxPrice: 21481, totalPrice: 85924 }]);
     expect(scan.candidates).toEqual([]);
   });
 
@@ -24,6 +24,16 @@ describe("full compartment detection", () => {
     const scan = findFullCompartments(await carriages("car-pricing-truncated-compartments"));
     expect(scan.confirmed).toEqual([]);
     expect(scan.candidates.map((candidate) => [candidate.carNumber, candidate.reason])).toEqual([["07", "compartment_layout_missing"], ["08", "compartment_layout_missing"]]);
+  });
+
+  test("counts places whose numbers carry a service marker", async () => {
+    const scan = findFullCompartments(await carriages("car-pricing-marked-places"));
+    expect(scan.candidates[0]).toEqual({ carNumber: "06", serviceClass: "2Ф", freePlaces: 6, largestCompartment: 2, reason: "places_not_in_one_compartment" });
+  });
+
+  test("confirms a marked compartment and keeps the markers on its places", async () => {
+    const scan = findFullCompartments(await carriages("car-pricing-marked-places"));
+    expect(scan.confirmed).toEqual([{ carNumber: "10", compartmentNumber: "9", places: [33, 34, 35, 36], placeLabels: ["33Ж", "34Ж", "35Ж", "36Ж"], serviceClass: "2К", minPrice: 18200, maxPrice: 18900, totalPrice: 72800 }]);
   });
 
   test("never confirms a compartment the raw response does not list with four free places", async () => {

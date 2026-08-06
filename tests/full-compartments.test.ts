@@ -9,7 +9,7 @@ describe("full compartment search", () => {
   test("reports a confirmed compartment with the date and train it came from", async () => {
     const client = clientWith("car-pricing-one-compartment");
     const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30));
-    expect(result.confirmed).toEqual([{ date: day(30), trainNumber: "002Э", departureTime: `${day(30)}T01:00:00`, arrivalTime: undefined, carNumber: "07", compartmentNumber: "1", places: [1, 2, 3, 4], serviceClass: "2К", minPrice: 21481, maxPrice: 21481, totalPrice: 85924 }]);
+    expect(result.confirmed).toEqual([{ date: day(30), trainNumber: "002Э", departureTime: `${day(30)}T01:00:00`, arrivalTime: undefined, carNumber: "07", compartmentNumber: "1", places: [1, 2, 3, 4], placeLabels: ["1", "2", "3", "4"], serviceClass: "2К", minPrice: 21481, maxPrice: 21481, totalPrice: 85924 }]);
     expect(result.candidates).toEqual([]);
     client.close();
   });
