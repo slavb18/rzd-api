@@ -76,7 +76,7 @@ describe("full compartment search", () => {
     const asked: unknown[] = [];
     const client = clientWith("car-pricing-one-compartment", { onSchemeImage: (...args) => asked.push(args) });
     const result = await client.searchFullCompartments("2000000", "2034130", day(30), day(30));
-    expect(result.image).toEqual({ data: "UE5H", mimeType: "image/png", carNumber: "07", compartmentNumber: "1" });
+    expect(result.image).toEqual({ data: "UE5H", mimeType: "image/png", url: "https://rzd-api.vercel.app/scheme/552/PcFirstStorey.png?free=1%2C2%2C3%2C4", carNumber: "07", compartmentNumber: "1" });
     expect(asked).toEqual([[552, "PcFirstStorey", { free: [1, 2, 3, 4] }]]);
     client.close();
   });

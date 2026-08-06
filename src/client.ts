@@ -2,6 +2,7 @@ import { RzdApi, type SchemeImageKind } from "./api.js";
 import type { SchemePlaces } from "./raster.js";
 import { findFullCompartments, type FullCompartmentCandidate, type FullCompartmentMatch, type FullCompartmentSearch, type SearchImage } from "./compartments.js";
 import { makeConfig, type RzdConfig } from "./config.js";
+import { schemeImageUrl } from "./log.js";
 import { RzdAmbiguousStationError, RzdSchemaError, RzdStationNotFoundError, RzdValidationError } from "./errors.js";
 import type { Carriage, CarImagesResult, CarriageResult, CarScheme, SchemeImageContent, RoundTripResult, RouteStationsResult, Station, TrainAvailabilityResult, TrainRoute, MinimalPricingResult } from "./models.js";
 
@@ -108,7 +109,8 @@ export class RzdClient {
       const scheme = await this.getCarScheme(source.date, source.time, source.train, car.number!, car.carSubType!, car.serviceClass!, car.carrier!, car.numeration ?? "FromHead");
       if (scheme.schemeId === undefined) return {};
       const content = await this.getSchemeImage(scheme.schemeId, "PcFirstStorey", { free: match.places });
-      return { image: { ...content, carNumber: match.carNumber, compartmentNumber: match.compartmentNumber } };
+      const url = schemeImageUrl(this.config.publicBaseUrl, scheme.schemeId, "PcFirstStorey", match.places);
+      return { image: { ...content, url, carNumber: match.carNumber, compartmentNumber: match.compartmentNumber } };
     } catch { return {}; }
   }
 
