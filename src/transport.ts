@@ -1,4 +1,5 @@
 import { RzdApiError, RzdHttpError, RzdTransportError, RzdValidationError } from "./errors.js";
+import { endpointLabel, logEvent } from "./log.js";
 import type { RzdConfig } from "./config.js";
 import type { JsonObject } from "./models.js";
 
@@ -14,7 +15,9 @@ export class RzdTransport {
     const target = new URL(url);
     for (const [key, value] of Object.entries(options.params ?? {})) if (value !== undefined) target.searchParams.set(key, String(value));
     let lastError: unknown;
+    const endpoint = endpointLabel(url, this.config.baseUrl);
     for (let attempt = 0; attempt <= this.config.retryTotal; attempt++) {
+      const started = Date.now();
       try {
         const response = await fetch(target, {
           method,
@@ -30,6 +33,7 @@ export class RzdTransport {
           tls: { rejectUnauthorized: !this.config.insecureTls },
         } as RequestInit);
         const text = await response.text();
+        logEvent({ upstream: endpoint, status: response.status, ms: Date.now() - started, attempt });
         if (!response.ok) {
           if ([429, 500, 502, 503, 504].includes(response.status) && attempt < this.config.retryTotal) {
             const retryAfter = Number(response.headers.get("retry-after"));
@@ -45,6 +49,7 @@ export class RzdTransport {
         return payload;
       } catch (error) {
         if (error instanceof RzdHttpError || error instanceof RzdApiError || error instanceof RzdTransportError) throw error;
+        logEvent({ upstream: endpoint, ms: Date.now() - started, attempt, error: error instanceof Error ? error.message.slice(0, 120) : String(error) });
         lastError = error;
         if (attempt < this.config.retryTotal) { await Bun.sleep(this.config.retryBackoffMs * 2 ** attempt); continue; }
       }
@@ -54,12 +59,14 @@ export class RzdTransport {
 
   async requestBytes(url: string): Promise<{ data: Uint8Array; mimeType: string }> {
     if (this.#closed) throw new RzdTransportError("The RZD client is closed.");
+    const started = Date.now();
     const response = await fetch(url, {
       headers: { Accept: "image/svg+xml, image/*", "User-Agent": this.config.userAgent ?? "Mozilla/5.0 AppleWebKit/537.36 Chrome/146 Safari/537.36", Referer: this.config.referer ?? "https://ticket.rzd.ru/" },
       signal: AbortSignal.timeout(this.config.timeoutMs),
       ...(this.config.proxy ? { proxy: this.config.proxy } : {}),
       tls: { rejectUnauthorized: !this.config.insecureTls },
     } as RequestInit);
+    logEvent({ upstream: endpointLabel(url, this.config.baseUrl), status: response.status, ms: Date.now() - started });
     if (!response.ok) throw new RzdHttpError(response.status, (await response.text()).slice(0, 300).trim());
     const mimeType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
     if (!mimeType.startsWith("image/")) throw new RzdTransportError(`RZD returned ${mimeType || "an unknown content type"} instead of an image.`);
