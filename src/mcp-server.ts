@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { schemeImageKinds } from "./api.js";
 import { RzdClient } from "./client.js";
 import { configFromEnvironment } from "./config.js";
+import { logEvent } from "./log.js";
 
 const station = z.string().describe("Station name or numeric station code");
 const date = z.string().describe("Date in DD.MM.YYYY, YYYY-MM-DD, or ISO format");
@@ -60,8 +61,16 @@ type Shape = Record<string, z.ZodTypeAny>;
 type ContentBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 function register<S extends Shape>(server: ToolServer, name: string, description: string, inputSchema: S, handler: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>, toContent: (value: unknown) => ContentBlock[] = (value) => [{ type: "text", text: JSON.stringify(value, null, 2) }]): void {
   server.registerTool(name, { description, inputSchema: z.object(inputSchema), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } } as never, (async (args: Record<string, unknown>) => {
-    try { return { content: toContent(await handler(args as z.infer<z.ZodObject<S>>)) }; }
-    catch (error) { return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true }; }
+    const started = Date.now();
+    try {
+      const content = toContent(await handler(args as z.infer<z.ZodObject<S>>));
+      logEvent({ tool: name, ms: Date.now() - started, ok: true, blocks: content.map((block) => block.type) });
+      return { content };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logEvent({ tool: name, ms: Date.now() - started, ok: false, error: message.slice(0, 200) });
+      return { content: [{ type: "text" as const, text: message }], isError: true };
+    }
   }) as never);
 }
 
