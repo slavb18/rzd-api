@@ -10,6 +10,7 @@
 - поиск станций и разрешение названий в коды;
 - календарь поездов и минимальные цены;
 - вагоны, места, схемы, изображения и станции маршрута;
+- поиск полностью свободного купе по диапазону дат;
 - MCP через STDIO и Streamable HTTP;
 - retries, таймауты и LRU-кэш станций.
 
@@ -42,7 +43,28 @@ try {
 
 Основные методы: `searchTickets`, `findStations`, `resolveStationCode`,
 `getCarriages`, `getTrainAvailability`, `getMinimalPrices`, `getCarScheme`,
-`getCarImages`, `getRouteStations`.
+`getCarImages`, `getRouteStations`, `searchFullCompartments`.
+
+## Полное купе
+
+`searchFullCompartments` и MCP-инструмент `search_full_compartments` перебирают
+диапазон дат (не более 31 дня) и разделяют два разных ответа:
+
+- `confirmed` — API вернул нужные места внутри одного купе (`FreePlacesByCompartments`),
+  указаны номер вагона, номер купе и сами места;
+- `candidates` — свободных мест в вагоне достаточно, но одно купе не подтверждено:
+  `places_not_in_one_compartment` (места в разных купе) или
+  `compartment_layout_missing` (в ответе нет разбивки по купе).
+
+Суммарное число свободных мест никогда не переводит вагон в `confirmed`. Инвариант
+закреплён тестами на фикстурах в `tests/fixtures/`, поэтому изменение парсера не может
+незаметно вернуть более смелую формулировку.
+
+Поле `checkedAt` содержит момент проверки по московскому времени: наличие мест
+устаревает за минуты. Даты, которые не удалось проверить, попадают в `errors`,
+а не молча превращаются в «мест нет».
+
+Готовая инструкция для ассистента лежит в `skills/find-full-compartment/`.
 
 ## MCP
 

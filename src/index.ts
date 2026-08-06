@@ -1,4 +1,5 @@
 export * from "./client.js";
+export * from "./compartments.js";
 export * from "./config.js";
 export * from "./errors.js";
 export * from "./models.js";

@@ -1,0 +1,11 @@
+interface:
+  display_name: "Find Full Train Compartment"
+  short_description: "Find fully available railway compartments"
+  default_prompt: "Use $find-full-compartment to find dates with an entirely free four-seat compartment."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "rzd"
+      description: "Live RZD routes, carriages, places, and prices"
+      transport: "streamable_http"
+      url: "https://rzd-api.vercel.app/mcp"
