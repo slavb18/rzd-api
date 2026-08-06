@@ -58,11 +58,21 @@ function imageAndText(value: unknown): ContentBlock[] {
   // otherwise have nothing to show, and one that truncates a long result would cut the link
   // off the end - both send it looking for a photograph of some other carriage instead.
   const described = image ? { image: { url: image.url, carNumber: image.carNumber, compartmentNumber: image.compartmentNumber }, ...rest } : rest;
-  return [{ type: "text", text: JSON.stringify(described, null, 2) }, ...(image ? [{ type: "image" as const, data: image.data, mimeType: image.mimeType }] : [])];
+  if (!image) return [{ type: "text", text: JSON.stringify(described, null, 2) }];
+  return [
+    { type: "text", text: JSON.stringify(described, null, 2) },
+    // Three ways to arrive at the same drawing, because clients differ in what they surface:
+    // the picture itself, annotated as meant for the reader, and a plain link to it.
+    { type: "image", data: image.data, mimeType: image.mimeType, annotations: { audience: ["user"], priority: 0.9 } },
+    ...(image.url ? [{ type: "resource_link" as const, uri: image.url, name: `carriage-${image.carNumber ?? "?"}-compartment-${image.compartmentNumber ?? "?"}.png`, description: "Carriage drawing with the free berths of this compartment filled blue", mimeType: "image/png" }] : []),
+  ];
 }
 
 type Shape = Record<string, z.ZodTypeAny>;
-type ContentBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string; annotations?: { audience: string[]; priority: number } }
+  | { type: "resource_link"; uri: string; name: string; description: string; mimeType: string };
 function register<S extends Shape>(server: ToolServer, name: string, description: string, inputSchema: S, handler: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>, toContent: (value: unknown) => ContentBlock[] = (value) => [{ type: "text", text: JSON.stringify(value, null, 2) }]): void {
   server.registerTool(name, { description, inputSchema: z.object(inputSchema), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } } as never, (async (args: Record<string, unknown>) => {
     const started = Date.now();
