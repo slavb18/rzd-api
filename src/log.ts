@@ -19,9 +19,10 @@ export function endpointLabel(url: string, baseUrl: string): string {
  *  this server actually talks to do exactly that - cannot use an image block, so the picture
  *  has to be reachable by URL. It points here rather than at ticket.rzd.ru because only this
  *  server paints the free berths; the upstream drawing is an unpainted template. */
-export function schemeImageUrl(baseUrl: string, schemeId: number, kind: string, free: number[]): string {
+export function schemeImageUrl(baseUrl: string, schemeId: number, kind: string, free: number[], selected: number[] = []): string {
   const url = new URL(`${baseUrl.replace(/\/$/, "")}/scheme/${schemeId}/${kind}.png`);
   if (free.length) url.searchParams.set("free", free.join(","));
+  if (selected.length) url.searchParams.set("selected", selected.join(","));
   return url.toString();
 }
 

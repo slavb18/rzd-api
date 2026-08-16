@@ -32,12 +32,12 @@ export class RzdApi {
   }
   async getMinimalPricing(origin: string, destination: string, dateFrom: string): Promise<MinimalPricingResult> {
     const root = objectPayload(await this.transport.requestJson("GET", `${this.baseUrl}/railway-service/train-minimal-pricing`, { params: { dateFrom, originCode: origin, destinationCode: destination } }), "train-minimal-pricing");
-    const prices = objectList(root, "PriceByDepartureDates", "train-minimal-pricing").map((node) => {
+    const prices = nullableObjectList(root, "PriceByDepartureDates", "train-minimal-pricing").map((node) => {
       const carriers = node.Carriers;
       if (!Array.isArray(carriers) || !carriers.every(isObject)) throw new RzdSchemaError("Invalid Carriers field.");
       return { date: stringValue(node, "DepatureDate", "DepartureDate") ?? fail("A pricing item has no departure date."), minPrice: numberValue(node, "MinPrice"), disabledPlaceMinPrice: numberValue(node, "DisabledPlaceMinPrice"), carriers, raw: node };
     });
-    return { originCode: requiredString(root, "OriginStationCode", "train-minimal-pricing"), destinationCode: requiredString(root, "DestinationStationCode", "train-minimal-pricing"), prices, raw: root };
+    return { originCode: stringValue(root, "OriginStationCode") ?? origin, destinationCode: stringValue(root, "DestinationStationCode") ?? destination, prices, raw: root };
   }
   async getCarriages(origin: string, destination: string, departureDate: string, trainNumber: string, provider: string): Promise<CarriageResult> {
     const root = objectPayload(await this.transport.requestJson("POST", `${this.b2bBaseUrl}/Railway/V1/Search/CarPricing`, { params: { service_provider: "B2B_RZD", isBonusPurchase: false }, body: { OriginCode: origin, DestinationCode: destination, Provider: provider, DepartureDate: departureDate, TrainNumber: trainNumber, SpecialPlacesDemand: "StandardPlacesAndForDisabledPersons", OnlyFpkBranded: false, HasPlacesForLargeFamily: false, CarIssuingType: "Passenger" } }), "carriage");
@@ -90,6 +90,10 @@ function parseRouteStation(node: JsonObject): RouteStation { return { name: stri
 function metadataParams(p: Record<string, string>): Record<string, string> { return { CarSubType: p.carSubType!, CarNumber: p.carNumber!, ServiceClass: p.serviceClass!, Carrier: p.carrier!, TrainNumber: p.trainNumber!, DepartureDate: p.departureDate!, CarNumeration: p.carNumeration! }; }
 function objectPayload(payload: JsonPayload, endpoint: string): JsonObject { if (!isObject(payload)) throw new RzdSchemaError(`The ${endpoint} response must be an object.`); return payload; }
 function objectList(root: JsonObject, key: string, endpoint: string): JsonObject[] { const value = root[key]; if (!Array.isArray(value) || !value.every(isObject)) throw new RzdSchemaError(`The ${endpoint} response has no supported ${key} list.`); return value; }
+/** A direction ticket.rzd.ru publishes no prices for comes back with every field explicitly
+ *  null. That is an empty answer, and reporting it as a changed schema costs the schema errors
+ *  their meaning - a key that has gone missing altogether still fails, as it should. */
+function nullableObjectList(root: JsonObject, key: string, endpoint: string): JsonObject[] { return root[key] === null ? [] : objectList(root, key, endpoint); }
 function requiredString(node: JsonObject, key: string, endpoint: string): string { return stringValue(node, key) ?? fail(`The ${endpoint} response has no ${key} field.`); }
 function stringValue(node: JsonObject, ...keys: string[]): string | undefined { for (const key of keys) if (node[key] !== undefined && node[key] !== null && node[key] !== "") return String(node[key]); return undefined; }
 function numberValue(node: JsonObject, ...keys: string[]): number | undefined { for (const key of keys) { const value = node[key]; if (value === undefined || value === null || value === "" || typeof value === "boolean") continue; const parsed = Number(value); if (!Number.isFinite(parsed)) throw new RzdSchemaError(`Field ${key} must be numeric.`); return parsed; } return undefined; }
